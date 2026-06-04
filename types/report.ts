@@ -1,5 +1,5 @@
 export interface ReportIndex {
-  reports: { date: string; kpi: ReportKPI }[]
+  reports: { date: string; reportType: string; kpi: ReportKPI }[]
 }
 
 export interface ReportKPI {
@@ -12,6 +12,7 @@ export interface ReportKPI {
 
 export interface Report {
   date: string             // YYYY-MM-DD
+  reportType: string       // e.g. 'obchodni'
   fetchedAt: string        // ISO timestamp
   kpi: ReportKPI
   sections: ReportSections

@@ -18,8 +18,8 @@ function fsBackend() {
       fs.mkdirSync(DATA_DIR, { recursive: true })
       fs.writeFileSync(path.join(DATA_DIR, `${report.date}.json`), JSON.stringify(report, null, 2), 'utf8')
       const index = this.loadIndex()
-      const existing = index.reports.findIndex((r) => r.date === report.date)
-      const entry = { date: report.date, kpi: report.kpi }
+      const existing = index.reports.findIndex((r) => r.date === report.date && r.reportType === report.reportType)
+      const entry = { date: report.date, reportType: report.reportType, kpi: report.kpi }
       if (existing >= 0) index.reports[existing] = entry
       else index.reports.push(entry)
       index.reports.sort((a, b) => (a.date < b.date ? 1 : -1))
@@ -80,8 +80,8 @@ async function blobLoadReport(date: string): Promise<Report | null> {
 async function blobSaveReport(report: Report): Promise<void> {
   await blobPut(blobReportPath(report.date), JSON.stringify(report, null, 2))
   const index = await blobLoadIndex()
-  const existing = index.reports.findIndex((r) => r.date === report.date)
-  const entry = { date: report.date, kpi: report.kpi }
+  const existing = index.reports.findIndex((r) => r.date === report.date && r.reportType === report.reportType)
+  const entry = { date: report.date, reportType: report.reportType, kpi: report.kpi }
   if (existing >= 0) index.reports[existing] = entry
   else index.reports.push(entry)
   index.reports.sort((a, b) => (a.date < b.date ? 1 : -1))

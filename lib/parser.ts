@@ -595,7 +595,7 @@ function computeKPI(sections: ReportSections): ReportKPI {
 // Main entry point
 // ---------------------------------------------------------------------------
 
-export function parseReportEmail(html: string, date: string, fetchedAt: string): Report {
+export function parseReportEmail(html: string, date: string, fetchedAt: string, reportType = 'obchodni'): Report {
   const $ = cheerio.load(html)
   const sections: ReportSections = {}
 
@@ -612,5 +612,5 @@ export function parseReportEmail(html: string, date: string, fetchedAt: string):
   try { sections.sec15 = parseSection15($) } catch (e) { console.error('sec15', e) }
 
   const kpi = computeKPI(sections)
-  return { date, fetchedAt, kpi, sections }
+  return { date, reportType, fetchedAt, kpi, sections }
 }
