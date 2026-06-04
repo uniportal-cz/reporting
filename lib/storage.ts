@@ -45,7 +45,11 @@ const blobReportPath = (date: string) => `reports/${date}.json`
 
 async function blobFetch(url: string): Promise<string | null> {
   try {
-    const res = await fetch(`${url}?t=${Date.now()}`, { cache: 'no-store' })
+    const token = process.env.BLOB_READ_WRITE_TOKEN
+    const res = await fetch(url, {
+      cache: 'no-store',
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
     if (!res.ok) return null
     return res.text()
   } catch { return null }
@@ -53,7 +57,7 @@ async function blobFetch(url: string): Promise<string | null> {
 
 async function blobPut(pathname: string, content: string): Promise<void> {
   const { put } = await import('@vercel/blob')
-  await put(pathname, content, { access: 'public', addRandomSuffix: false, contentType: 'application/json' })
+  await put(pathname, content, { addRandomSuffix: false, contentType: 'application/json' })
 }
 
 async function blobLoadIndex(): Promise<ReportIndex> {
