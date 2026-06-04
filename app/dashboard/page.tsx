@@ -4,17 +4,39 @@ import { redirect } from 'next/navigation'
 import type { Report, ReportIndex } from '@/types/report'
 import { REPORT_TYPES, DEFAULT_REPORT_TYPE } from '@/lib/report-types'
 
+export interface StorageStatus {
+  backend: string
+  persistent: boolean
+  detail: string
+}
+
 interface Props {
   searchParams: { date?: string; type?: string }
 }
 
 export const dynamic = 'force-dynamic'
 
+function getStorageStatus(): StorageStatus {
+  const isVercel = process.env.VERCEL === '1'
+  const hasBlobToken = !!process.env.BLOB_READ_WRITE_TOKEN
+  if (hasBlobToken) {
+    return { backend: 'Vercel Blob', persistent: true, detail: 'Data jsou trvale uložena v Vercel Blob storage.' }
+  }
+  if (isVercel) {
+    return {
+      backend: '/tmp',
+      persistent: false,
+      detail: 'BLOB_READ_WRITE_TOKEN není nastaven. Data nepřežijí restart. Nastav Vercel Blob store: Vercel dashboard → Storage → Create → Blob → Connect to project.',
+    }
+  }
+  return { backend: 'filesystem', persistent: true, detail: 'Lokální vývoj — ./data/reports/' }
+}
+
 export default async function DashboardPage({ searchParams }: Props) {
   const activeType = REPORT_TYPES.find((t) => t.id === searchParams.type)?.id ?? DEFAULT_REPORT_TYPE
+  const storageStatus = getStorageStatus()
 
   const fullIndex: ReportIndex = await loadIndex()
-  // Filter to last 10 for this type
   const typeReports = fullIndex.reports
     .filter((r) => (r.reportType ?? 'obchodni') === activeType)
     .slice(0, 10)
@@ -39,6 +61,7 @@ export default async function DashboardPage({ searchParams }: Props) {
         report={emptyReport(new Date().toISOString().slice(0, 10))}
         index={filteredIndex}
         activeType={activeType}
+        storageStatus={storageStatus}
       />
     )
   }
@@ -53,9 +76,17 @@ export default async function DashboardPage({ searchParams }: Props) {
         report={emptyReport(targetDate)}
         index={filteredIndex}
         activeType={activeType}
+        storageStatus={storageStatus}
       />
     )
   }
 
-  return <DashboardClient report={report} index={filteredIndex} activeType={activeType} />
+  return (
+    <DashboardClient
+      report={report}
+      index={filteredIndex}
+      activeType={activeType}
+      storageStatus={storageStatus}
+    />
+  )
 }
