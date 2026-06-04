@@ -1,7 +1,9 @@
 export interface ReportTypeConfig {
   id: string
   label: string
-  // Returns true if the email subject belongs to this type
+  // Keyword searched in IMAP SUBJECT — keep ASCII-safe for server compatibility
+  subjectKeyword: string
+  // Client-side subject match (broader fallback)
   matchSubject: (subject: string) => boolean
 }
 
@@ -9,7 +11,11 @@ export const REPORT_TYPES: ReportTypeConfig[] = [
   {
     id: 'obchodni',
     label: 'Obchodní',
-    matchSubject: () => true, // default — catches all until more types are added
+    subjectKeyword: 'Obchodn', // prefix without diacritics to be safe with IMAP SEARCH
+    matchSubject: (subject: string) => {
+      const s = subject.toLowerCase()
+      return s.includes('obchodní report') || s.includes('obchodni report')
+    },
   },
 ]
 
@@ -24,4 +30,8 @@ export function detectReportType(subject: string): string {
 
 export function getReportTypeLabel(id: string): string {
   return REPORT_TYPES.find((t) => t.id === id)?.label ?? id
+}
+
+export function getReportTypeConfig(id: string): ReportTypeConfig | undefined {
+  return REPORT_TYPES.find((t) => t.id === id)
 }

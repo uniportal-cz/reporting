@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { fetchLatestReportEmail, fetchReportEmailByDate } from '@/lib/imap'
 import { parseReportEmail } from '@/lib/parser'
 import { saveReport } from '@/lib/storage'
-import { detectReportType } from '@/lib/report-types'
+import { detectReportType, getReportTypeConfig, DEFAULT_REPORT_TYPE } from '@/lib/report-types'
 import { format } from 'date-fns'
 
 export const runtime = 'nodejs'
@@ -21,12 +21,17 @@ export async function POST(req: Request) {
       // no body or invalid JSON
     }
 
+    const typeId = forcedType ?? DEFAULT_REPORT_TYPE
+    const typeConfig = getReportTypeConfig(typeId)
+    const keyword = typeConfig?.subjectKeyword
+    const matcher = typeConfig?.matchSubject
+
     const fetched = targetDate
-      ? await fetchReportEmailByDate(targetDate)
-      : await fetchLatestReportEmail()
+      ? await fetchReportEmailByDate(targetDate, keyword, matcher)
+      : await fetchLatestReportEmail(keyword, matcher)
 
     if (!fetched) {
-      return NextResponse.json({ error: 'No report email found' }, { status: 404 })
+      return NextResponse.json({ error: `Nenalezen email s předmětem odpovídajícím typu "${typeId}"` }, { status: 404 })
     }
 
     const date = format(fetched.date, 'yyyy-MM-dd')
