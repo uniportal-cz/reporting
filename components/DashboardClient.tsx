@@ -38,17 +38,23 @@ function KpiCard({ label, value, color }: KpiCardProps) {
 
 // ─── Collapsible section ──────────────────────────────────────────────────────
 
-interface CollapsibleProps { title: string; badge: number; badgeColor?: 'red'|'orange'|'blue'|'gray'|'purple'; children: React.ReactNode }
+interface CollapsibleProps { title: string; badge: number; badgeColor?: 'red'|'orange'|'blue'|'gray'|'purple'; description?: string; children: React.ReactNode }
 
-function CollapsibleSection({ title, badge, badgeColor = 'gray', children }: CollapsibleProps) {
+function CollapsibleSection({ title, badge, badgeColor = 'gray', description, children }: CollapsibleProps) {
   const [open, setOpen] = useState(false)
-  const badgeCls = { red: 'bg-red-100 text-red-700', orange: 'bg-orange-100 text-orange-700', blue: 'bg-blue-100 text-blue-700', gray: 'bg-gray-100 text-gray-600', purple: 'bg-purple-100 text-purple-700' }[badgeColor]
+  const isEmpty = badge === 0
+  const badgeCls = isEmpty
+    ? 'bg-green-100 text-green-700'
+    : { red: 'bg-red-100 text-red-700', orange: 'bg-orange-100 text-orange-700', blue: 'bg-blue-100 text-blue-700', gray: 'bg-gray-100 text-gray-600', purple: 'bg-purple-100 text-purple-700' }[badgeColor]
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+    <div className={`overflow-hidden rounded-xl border bg-white shadow-sm ${isEmpty ? 'border-green-100' : 'border-gray-200'}`}>
       <button className="flex w-full items-center justify-between px-5 py-3.5 text-left transition-colors hover:bg-gray-50" onClick={() => setOpen(!open)}>
-        <span className="font-semibold text-gray-800 text-sm">{title}</span>
-        <div className="flex items-center gap-3">
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${badgeCls}`}>{badge}</span>
+        <div className="flex flex-col gap-0.5 min-w-0">
+          <span className={`font-semibold text-sm ${isEmpty ? 'text-gray-500' : 'text-gray-800'}`}>{title}</span>
+          {description && <span className="text-xs text-gray-400 font-normal leading-snug">{description}</span>}
+        </div>
+        <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${badgeCls}`}>{isEmpty ? '✓' : badge}</span>
           <svg className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
           </svg>
@@ -56,9 +62,18 @@ function CollapsibleSection({ title, badge, badgeColor = 'gray', children }: Col
       </button>
       {open && (
         <div className="border-t border-gray-100 px-5 py-4">
-          <Suspense fallback={<div className="py-6 text-center text-sm text-gray-400">Načítám…</div>}>
-            {children}
-          </Suspense>
+          {isEmpty ? (
+            <div className="flex items-center gap-2 py-3 text-sm text-green-700">
+              <svg className="w-4 h-4 text-green-500 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              V pořádku — žádné položky k řešení
+            </div>
+          ) : (
+            <Suspense fallback={<div className="py-6 text-center text-sm text-gray-400">Načítám…</div>}>
+              {children}
+            </Suspense>
+          )}
         </div>
       )}
     </div>
@@ -77,7 +92,6 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
 
   const s = report.sections
   const kpi = report.kpi
-  const isEmpty = !s.sec1 && !s.sec2 && !s.sec3 && !s.sec4 && !s.sec7 && !s.sec9 && !s.sec11 && !s.sec12 && !s.sec13 && !s.sec14 && !s.sec15
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
@@ -183,30 +197,107 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
               <KpiCard label="Likvidace – termínů" value={kpi.sec9_terms} color="purple" />
             </div>
 
-            {/* Sections */}
-            {isEmpty ? (
-              <div className="rounded-xl border border-dashed border-gray-300 bg-white p-12 text-center">
-                <svg className="mx-auto w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p className="text-sm text-gray-500 font-medium">Žádná data k zobrazení</p>
-                <p className="text-xs text-gray-400 mt-1">Klikni „Načíst nový report" pro stažení z emailu.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {s.sec1 && <CollapsibleSection title="1. Zapnutý v doprodeji bez zásoby" badge={s.sec1.count} badgeColor="orange"><Section1 data={s.sec1} date={report.date} /></CollapsibleSection>}
-                {s.sec2 && <CollapsibleSection title="2. Saleable bez dodavatelského skladu" badge={s.sec2.dodavatele.reduce((n, d) => n + d.produkty.length, 0)} badgeColor="blue"><Section2 data={s.sec2} date={report.date} /></CollapsibleSection>}
-                {s.sec3 && <CollapsibleSection title="3. WithVariant s rozdílnou cenou" badge={s.sec3.items.length} badgeColor="blue"><Section3 data={s.sec3} date={report.date} /></CollapsibleSection>}
-                {s.sec4 && <CollapsibleSection title="4. Nelze doručit" badge={kpi.sec4_count} badgeColor="red"><Section4 data={s.sec4} date={report.date} /></CollapsibleSection>}
-                {s.sec7 && <CollapsibleSection title="7. Dárek není skladem" badge={s.sec7.items.length} badgeColor="orange"><Section7 data={s.sec7} date={report.date} /></CollapsibleSection>}
-                {s.sec9 && <CollapsibleSection title="9. Objednány k likvidaci" badge={s.sec9.terminy.length} badgeColor="purple"><Section9 data={s.sec9} date={report.date} reportDate={report.date} /></CollapsibleSection>}
-                {s.sec11 && <CollapsibleSection title="11. Mimo saleable" badge={s.sec11.celkem} badgeColor="gray"><Section11 data={s.sec11} date={report.date} /></CollapsibleSection>}
-                {s.sec12 && <CollapsibleSection title="12. Nezadané rozměry" badge={s.sec12.celkem_produktu} badgeColor="gray"><Section12 data={s.sec12} date={report.date} /></CollapsibleSection>}
-                {s.sec13 && <CollapsibleSection title="13. Saleable bez kategorie" badge={s.sec13.items.length} badgeColor="blue"><Section13 data={s.sec13} date={report.date} /></CollapsibleSection>}
-                {s.sec14 && <CollapsibleSection title="14. Záporná marže" badge={kpi.sec14_count} badgeColor="red"><Section14 data={s.sec14} date={report.date} /></CollapsibleSection>}
-                {s.sec15 && <CollapsibleSection title="15. Nesoulad kategorizace" badge={s.sec15.kategorie.reduce((n, k) => n + k.produktu_mimo, 0)} badgeColor="gray"><Section15 data={s.sec15} date={report.date} /></CollapsibleSection>}
-              </div>
-            )}
+            {/* Sections — always rendered, green when empty */}
+            <div className="space-y-2">
+              <CollapsibleSection
+                title="1. Zapnutý produkt v doprodeji bez zásoby"
+                description="Nabídka něčeho, co nejsme schopni dodat — produkt je aktivní v doprodeji, ale není k dispozici žádná zásoba."
+                badge={s.sec1?.count ?? 0}
+                badgeColor="orange"
+              >
+                {s.sec1 && <Section1 data={s.sec1} date={report.date} />}
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="2. Saleable bez dodavatelského skladu"
+                description="Produkt je označen jako prodejný, ale není napojen na žádný dodavatelský sklad — nelze zajistit zásobování."
+                badge={s.sec2 ? s.sec2.dodavatele.reduce((n, d) => n + d.produkty.length, 0) : 0}
+                badgeColor="blue"
+              >
+                {s.sec2 && <Section2 data={s.sec2} date={report.date} />}
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="3. WithVariant s rozdílnou cenou"
+                description="Variantní produkty mají nekonzistentní ceny — různé varianty téhož produktu se liší cenou, což může způsobit zobrazení špatné ceny."
+                badge={s.sec3?.items.length ?? 0}
+                badgeColor="blue"
+              >
+                {s.sec3 && <Section3 data={s.sec3} date={report.date} />}
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="4. Nelze doručit"
+                description="Produkty, které nelze doručit — jsou aktivní, ale jejich konfigurace dopravy nebo dostupnost to neumožňuje."
+                badge={kpi.sec4_count}
+                badgeColor="red"
+              >
+                {s.sec4 && <Section4 data={s.sec4} date={report.date} />}
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="7. Dárek není skladem"
+                description="Produkt nastavený jako dárek k objednávce není momentálně skladem — zákazník dárek nedostane."
+                badge={s.sec7?.items.length ?? 0}
+                badgeColor="orange"
+              >
+                {s.sec7 && <Section7 data={s.sec7} date={report.date} />}
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="9. Objednány k likvidaci"
+                description="Produkty s blížícím se termínem likvidace — je třeba je prodat nebo zajistit jejich vyřazení před vypršením lhůty."
+                badge={s.sec9?.terminy.length ?? 0}
+                badgeColor="purple"
+              >
+                {s.sec9 && <Section9 data={s.sec9} date={report.date} reportDate={report.date} />}
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="11. Mimo saleable"
+                description="Produkty, které jsou v systému aktivní, ale nesplňují podmínky pro zařazení do prodejního katalogu (saleable)."
+                badge={s.sec11?.celkem ?? 0}
+                badgeColor="gray"
+              >
+                {s.sec11 && <Section11 data={s.sec11} date={report.date} />}
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="12. Nezadané rozměry"
+                description="Produkty bez vyplněných rozměrů — chybějící parametry znemožňují správný výpočet dopravy nebo zobrazení filtru."
+                badge={s.sec12?.celkem_produktu ?? 0}
+                badgeColor="gray"
+              >
+                {s.sec12 && <Section12 data={s.sec12} date={report.date} />}
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="13. Saleable bez kategorie"
+                description="Prodejné produkty bez přiřazené kategorie — zákazník je nenajde v navigaci ani filtrech, jsou prakticky neviditelné."
+                badge={s.sec13?.items.length ?? 0}
+                badgeColor="blue"
+              >
+                {s.sec13 && <Section13 data={s.sec13} date={report.date} />}
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="14. Záporná marže"
+                description="Produkty, jejichž prodejní cena je nižší než nákupní — každý prodej generuje přímou ztrátu."
+                badge={kpi.sec14_count}
+                badgeColor="red"
+              >
+                {s.sec14 && <Section14 data={s.sec14} date={report.date} />}
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="15. Nesoulad kategorizace"
+                description="Produkty zařazené do kategorií, které neodpovídají jejich skutečným atributům — vede k chybným filtrům a špatné zkušenosti zákazníka."
+                badge={s.sec15 ? s.sec15.kategorie.reduce((n, k) => n + k.produktu_mimo, 0) : 0}
+                badgeColor="gray"
+              >
+                {s.sec15 && <Section15 data={s.sec15} date={report.date} />}
+              </CollapsibleSection>
+            </div>
           </div>
         </main>
       </div>
