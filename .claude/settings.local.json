@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm show *)",
+      "Bash(node -e \"const v=require\\('fs'\\).readFileSync\\('/dev/stdin','utf8'\\); const versions=JSON.parse\\(v\\); const v14=versions.filter\\(v=>v.startsWith\\('14.'\\)\\).slice\\(-5\\); console.log\\(v14\\)\")",
+      "Bash(npm audit *)",
+      "Bash(npm run *)",
+      "Bash(npm list *)",
+      "Bash(git init *)",
+      "Bash(git remote *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git config *)",
+      "Bash(git push *)",
+      "Bash(node -e \"const c = require\\('cheerio'\\); console.log\\(Object.keys\\(c\\).filter\\(k => k.includes\\('lement'\\) || k.includes\\('heerio'\\)\\)\\)\")",
+      "Bash(node -e \"const c = require\\('cheerio'\\); console.log\\(Object.keys\\(c\\)\\)\")",
+      "Bash(git reset *)"
+    ]
+  }
+}

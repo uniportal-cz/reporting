@@ -119,7 +119,7 @@ export async function GET(
   const url = new URL(req.url)
   const section = url.searchParams.get('section') || ''
 
-  const report = loadReport(date)
+  const report = await loadReport(date)
   if (!report) {
     return NextResponse.json({ error: 'Report not found' }, { status: 404 })
   }

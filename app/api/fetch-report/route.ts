@@ -32,7 +32,7 @@ export async function POST(req: Request) {
     const fetchedAt = new Date().toISOString()
     const report = parseReportEmail(fetched.html, date, fetchedAt)
 
-    saveReport(report)
+    await saveReport(report)
 
     return NextResponse.json({
       success: true,

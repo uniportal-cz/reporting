@@ -50,7 +50,7 @@ async function main() {
     )
     console.log(`[fetch-report] Sections found: ${sectionNames.join(', ') || 'none'}`)
 
-    saveReport(report)
+    await saveReport(report)
     console.log(`[fetch-report] Saved to data/reports/${date}.json`)
     console.log('[fetch-report] Done.')
   } catch (error) {

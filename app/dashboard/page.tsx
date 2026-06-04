@@ -9,8 +9,8 @@ interface Props {
 
 export const dynamic = 'force-dynamic'
 
-export default function DashboardPage({ searchParams }: Props) {
-  const index: ReportIndex = loadIndex()
+export default async function DashboardPage({ searchParams }: Props) {
+  const index: ReportIndex = await loadIndex()
 
   // Pick the date to show
   let targetDate = searchParams.date
@@ -30,7 +30,7 @@ export default function DashboardPage({ searchParams }: Props) {
     return <DashboardClient report={emptyReport} index={emptyIndex} />
   }
 
-  const report = loadReport(targetDate)
+  const report = await loadReport(targetDate)
   if (!report) {
     // Date requested but not found — show most recent
     if (index.reports.length > 0) {

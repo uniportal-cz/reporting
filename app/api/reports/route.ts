@@ -6,7 +6,7 @@ export const maxDuration = 30
 
 export async function GET() {
   try {
-    const index = loadIndex()
+    const index = await loadIndex()
     return NextResponse.json(index)
   } catch (error) {
     console.error('GET /api/reports error:', error)
