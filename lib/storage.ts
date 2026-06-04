@@ -43,40 +43,28 @@ function fsBackend() {
 const BLOB_INDEX = 'reports/index.json'
 const blobReportPath = (date: string) => `reports/${date}.json`
 
-async function blobFetch(url: string): Promise<string | null> {
+async function blobGet(pathname: string): Promise<string | null> {
   try {
-    const token = process.env.BLOB_READ_WRITE_TOKEN
-    const res = await fetch(url, {
-      cache: 'no-store',
-      headers: token ? { Authorization: `Bearer ${token}` } : {},
-    })
-    if (!res.ok) return null
-    return res.text()
+    const { get } = await import('@vercel/blob')
+    const result = await get(pathname, { access: 'private' })
+    if (!result || result.statusCode !== 200 || !result.stream) return null
+    return new Response(result.stream).text()
   } catch { return null }
 }
 
 async function blobPut(pathname: string, content: string): Promise<void> {
   const { put } = await import('@vercel/blob')
-  await put(pathname, content, { addRandomSuffix: false, contentType: 'application/json' })
+  await put(pathname, content, { access: 'private', addRandomSuffix: false, contentType: 'application/json' })
 }
 
 async function blobLoadIndex(): Promise<ReportIndex> {
-  const { list } = await import('@vercel/blob')
-  const { blobs } = await list({ prefix: BLOB_INDEX })
-  const blob = blobs.find((b) => b.pathname === BLOB_INDEX)
-  if (!blob) return { reports: [] }
-  const raw = await blobFetch(blob.url)
+  const raw = await blobGet(BLOB_INDEX)
   if (!raw) return { reports: [] }
   try { return JSON.parse(raw) } catch { return { reports: [] } }
 }
 
 async function blobLoadReport(date: string): Promise<Report | null> {
-  const { list } = await import('@vercel/blob')
-  const pathname = blobReportPath(date)
-  const { blobs } = await list({ prefix: pathname })
-  const blob = blobs.find((b) => b.pathname === pathname)
-  if (!blob) return null
-  const raw = await blobFetch(blob.url)
+  const raw = await blobGet(blobReportPath(date))
   if (!raw) return null
   try { return JSON.parse(raw) } catch { return null }
 }
