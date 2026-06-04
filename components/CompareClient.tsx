@@ -45,7 +45,7 @@ export default function CompareClient({ reports, allDates, selectedDates, active
 
   function applySelection(next: Set<string>) {
     setPicked(next)
-    const dates = [...next].sort().join(',')
+    const dates = Array.from(next).sort().join(',')
     router.push(`/dashboard/compare?type=${activeType}&dates=${dates}`)
   }
 
@@ -243,7 +243,7 @@ export default function CompareClient({ reports, allDates, selectedDates, active
                           </tr>
                         </thead>
                         <tbody>
-                          {[...allCodes].filter(Boolean).sort().slice(0, 100).map((code) => {
+                          {Array.from(allCodes).filter(Boolean).sort().slice(0, 100).map((code) => {
                             const presence = sorted.map((r) => {
                               const sec = r.sections[secKey]
                               if (!sec) return false
