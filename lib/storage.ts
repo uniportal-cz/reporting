@@ -54,7 +54,7 @@ async function blobGet(pathname: string): Promise<string | null> {
 
 async function blobPut(pathname: string, content: string): Promise<void> {
   const { put } = await import('@vercel/blob')
-  await put(pathname, content, { access: 'private', addRandomSuffix: false, contentType: 'application/json' })
+  await put(pathname, content, { access: 'private', addRandomSuffix: false, allowOverwrite: true, contentType: 'application/json' })
 }
 
 async function blobLoadIndex(): Promise<ReportIndex> {

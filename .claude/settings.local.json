@@ -15,7 +15,8 @@
       "Bash(git push *)",
       "Bash(node -e \"const c = require\\('cheerio'\\); console.log\\(Object.keys\\(c\\).filter\\(k => k.includes\\('lement'\\) || k.includes\\('heerio'\\)\\)\\)\")",
       "Bash(node -e \"const c = require\\('cheerio'\\); console.log\\(Object.keys\\(c\\)\\)\")",
-      "Bash(git reset *)"
+      "Bash(git reset *)",
+      "Bash(node *)"
     ]
   }
 }

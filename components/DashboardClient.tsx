@@ -113,8 +113,8 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
           </div>
         </div>
 
-        {/* Type tabs */}
-        <div className="flex border-t border-gray-100 px-5">
+        {/* Type tabs + compare button */}
+        <div className="flex items-center border-t border-gray-100 px-5">
           {REPORT_TYPES.map((t) => (
             <button
               key={t.id}
@@ -128,6 +128,17 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
               {t.label}
             </button>
           ))}
+          <div className="ml-auto">
+            <button
+              onClick={() => router.push(`/dashboard/compare?type=${activeType}`)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              Srovnat
+            </button>
+          </div>
         </div>
       </header>
 
