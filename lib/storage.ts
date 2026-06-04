@@ -1,15 +1,17 @@
 import { Report, ReportIndex } from '@/types/report'
 
-// Use Vercel Blob when token is available (production), filesystem otherwise (local dev)
+// Use Vercel Blob when token is available, otherwise filesystem
+// On Vercel without Blob: use /tmp (writable, ephemeral per cold start)
 const USE_BLOB = !!process.env.BLOB_READ_WRITE_TOKEN
+const DATA_BASE = process.env.VERCEL === '1' ? '/tmp' : process.cwd()
 
-// ─── Filesystem backend (local dev / own server) ────────────────────────────
+// ─── Filesystem backend (local dev / Vercel /tmp) ───────────────────────────
 
 function fsBackend() {
   const fs = require('fs') as typeof import('fs')
   const path = require('path') as typeof import('path')
-  const DATA_DIR = path.join(process.cwd(), 'data', 'reports')
-  const INDEX_FILE = path.join(process.cwd(), 'data', 'index.json')
+  const DATA_DIR = path.join(DATA_BASE, 'data', 'reports')
+  const INDEX_FILE = path.join(DATA_BASE, 'data', 'index.json')
 
   return {
     saveReport(report: Report): void {
