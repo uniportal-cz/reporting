@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { fetchLatestReportEmail, fetchReportEmailByDate } from '@/lib/imap'
+import { fetchLatestReportEmail, fetchReportEmailByDate, fetchEmailByUidPublic } from '@/lib/imap'
 import { parseReportEmail } from '@/lib/parser'
 import { saveReport } from '@/lib/storage'
 import { detectReportType, getReportTypeConfig, DEFAULT_REPORT_TYPE } from '@/lib/report-types'
@@ -12,11 +12,13 @@ export async function POST(req: Request) {
   try {
     let targetDate: Date | undefined
     let forcedType: string | undefined
+    let uid: number | undefined
 
     try {
       const body = await req.json()
       if (body?.date) targetDate = new Date(body.date)
       if (body?.reportType) forcedType = body.reportType
+      if (body?.uid !== undefined && body.uid !== null) uid = Number(body.uid)
     } catch {
       // no body or invalid JSON
     }
@@ -26,12 +28,22 @@ export async function POST(req: Request) {
     const keyword = typeConfig?.subjectKeyword
     const matcher = typeConfig?.matchSubject
 
-    const fetched = targetDate
-      ? await fetchReportEmailByDate(targetDate, keyword, matcher)
-      : await fetchLatestReportEmail(keyword, matcher)
+    let fetched = null
 
-    if (!fetched) {
-      return NextResponse.json({ error: `Nenalezen email s předmětem odpovídajícím typu "${typeId}"` }, { status: 404 })
+    if (uid !== undefined) {
+      // Fetch specific email by UID
+      fetched = await fetchEmailByUidPublic(uid)
+      if (!fetched) {
+        return NextResponse.json({ error: `Email s UID ${uid} nebyl nalezen` }, { status: 404 })
+      }
+    } else {
+      fetched = targetDate
+        ? await fetchReportEmailByDate(targetDate, keyword, matcher)
+        : await fetchLatestReportEmail(keyword, matcher)
+
+      if (!fetched) {
+        return NextResponse.json({ error: `Nenalezen email s předmětem odpovídajícím typu "${typeId}"` }, { status: 404 })
+      }
     }
 
     const date = format(fetched.date, 'yyyy-MM-dd')

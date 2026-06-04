@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useCallback, lazy, Suspense } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import { Report, ReportIndex, ReportKPI } from '@/types/report'
+import { Report, ReportIndex } from '@/types/report'
 import { REPORT_TYPES } from '@/lib/report-types'
 import { format, parseISO, isValid } from 'date-fns'
 import { cs } from 'date-fns/locale'
+import EmailBrowser from './EmailBrowser'
 
 const Section1 = lazy(() => import('./sections/Section1'))
 const Section2 = lazy(() => import('./sections/Section2'))
@@ -69,31 +70,6 @@ interface Props { report: Report; index: ReportIndex; activeType: string }
 
 export default function DashboardClient({ report, index, activeType }: Props) {
   const router = useRouter()
-  const [fetching, setFetching] = useState(false)
-  const [fetchError, setFetchError] = useState<string | null>(null)
-
-  const handleFetch = useCallback(async () => {
-    setFetching(true)
-    setFetchError(null)
-    try {
-      const res = await fetch('/api/fetch-report', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reportType: activeType }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        setFetchError(data.error || 'Chyba při stahování')
-      } else {
-        router.push(`/dashboard?type=${activeType}&date=${data.date}`)
-        router.refresh()
-      }
-    } catch {
-      setFetchError('Síťová chyba')
-    } finally {
-      setFetching(false)
-    }
-  }, [router, activeType])
 
   const s = report.sections
   const kpi = report.kpi
@@ -105,7 +81,7 @@ export default function DashboardClient({ report, index, activeType }: Props) {
       {/* ── Header ── */}
       <header className="flex-shrink-0 border-b border-gray-200 bg-white shadow-sm">
         {/* Top row */}
-        <div className="flex items-center justify-between px-5 py-3">
+        <div className="flex items-center px-5 py-3">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center flex-shrink-0">
               <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -117,17 +93,6 @@ export default function DashboardClient({ report, index, activeType }: Props) {
               <span className="ml-2 text-xs text-gray-400">Sportega</span>
             </div>
           </div>
-
-          <button
-            onClick={handleFetch}
-            disabled={fetching}
-            className="flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50 transition-colors"
-          >
-            <svg className={`w-3.5 h-3.5 ${fetching ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-            {fetching ? 'Stahuje se…' : 'Načíst nový report'}
-          </button>
         </div>
 
         {/* Type tabs */}
@@ -146,60 +111,20 @@ export default function DashboardClient({ report, index, activeType }: Props) {
             </button>
           ))}
         </div>
-
-        {fetchError && (
-          <div className="border-t border-red-100 bg-red-50 px-5 py-2 text-sm text-red-600">{fetchError}</div>
-        )}
       </header>
 
       {/* ── Body (sidebar + main) ── */}
       <div className="flex flex-1 overflow-hidden">
 
-        {/* Left panel — report history */}
-        <aside className="flex w-52 flex-shrink-0 flex-col border-r border-gray-200 bg-white overflow-hidden">
-          <div className="border-b border-gray-100 px-4 py-2.5">
-            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400">Posledních 10 reportů</p>
-          </div>
-          <nav className="flex-1 overflow-y-auto">
-            {index.reports.length === 0 ? (
-              <div className="px-4 py-6 text-center text-xs text-gray-400">
-                Žádné reporty.<br />Klikni „Načíst nový report".
-              </div>
-            ) : (
-              <ul>
-                {index.reports.map((r) => {
-                  const d = parseISO(r.date)
-                  const isActive = r.date === report.date
-                  const hasProblems = r.kpi.sec14_count > 0 || r.kpi.sec4_count > 0
-                  return (
-                    <li key={r.date}>
-                      <button
-                        onClick={() => router.push(`/dashboard?type=${activeType}&date=${r.date}`)}
-                        className={`w-full text-left px-4 py-3 border-b border-gray-50 transition-colors ${
-                          isActive ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className={`text-sm font-medium ${isActive ? 'text-blue-700' : 'text-gray-800'}`}>
-                            {isValid(d) ? format(d, 'EEE d. M.', { locale: cs }) : r.date}
-                          </span>
-                          {hasProblems && (
-                            <span className="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" title="Kritické problémy" />
-                          )}
-                        </div>
-                        <div className="mt-0.5 flex gap-2 text-xs text-gray-400">
-                          {r.kpi.sec1_count > 0 && <span>D:{r.kpi.sec1_count}</span>}
-                          {r.kpi.sec14_count > 0 && <span className="text-red-500">M:{r.kpi.sec14_count}</span>}
-                          {r.kpi.sec4_count > 0 && <span className="text-red-500">ND:{r.kpi.sec4_count}</span>}
-                        </div>
-                      </button>
-                    </li>
-                  )
-                })}
-              </ul>
-            )}
-          </nav>
-        </aside>
+        {/* Left panel — email browser */}
+        <EmailBrowser
+          activeType={activeType}
+          loadedDates={index.reports.map(r => r.date)}
+          onReportLoaded={(date) => {
+            router.push(`/dashboard?type=${activeType}&date=${date}`)
+            router.refresh()
+          }}
+        />
 
         {/* Main content */}
         <main className="flex-1 overflow-y-auto">

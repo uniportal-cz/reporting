@@ -151,3 +151,84 @@ async function fetchEmailByUid(client: ImapFlow, uid: number): Promise<FetchedEm
   }
   return null
 }
+
+// ---------------------------------------------------------------------------
+// EmailSummary — lightweight listing without fetching body
+// ---------------------------------------------------------------------------
+
+export interface EmailSummary {
+  uid: number
+  subject: string
+  date: Date
+  seen: boolean
+}
+
+/**
+ * List report emails from IMAP without downloading bodies.
+ * Returns results sorted newest-first, up to `limit` items.
+ */
+export async function listReportEmails(
+  subjectKeyword?: string,
+  matchSubject?: (subject: string) => boolean,
+  limit = 50
+): Promise<EmailSummary[]> {
+  const client = createClient()
+  try {
+    await client.connect()
+    const mailbox = await client.mailboxOpen('INBOX')
+    if (mailbox.exists === 0) return []
+
+    let uids: number[] = []
+
+    if (subjectKeyword) {
+      try {
+        uids = await client.search({ subject: subjectKeyword }, { uid: true }) as number[]
+      } catch {
+        uids = []
+      }
+    }
+
+    if (uids.length === 0) {
+      const start = Math.max(1, mailbox.exists - 199)
+      for await (const msg of client.fetch(`${start}:*`, { uid: true, envelope: true })) {
+        const subject = msg.envelope?.subject || ''
+        const passes = matchSubject ? matchSubject(subject) : subject.toLowerCase().includes('report')
+        if (passes) uids.push(msg.uid)
+      }
+    }
+
+    if (uids.length === 0) return []
+
+    const results: EmailSummary[] = []
+
+    for await (const msg of client.fetch(uids, { uid: true, envelope: true, flags: true }, { uid: true })) {
+      const subject = msg.envelope?.subject || ''
+      if (matchSubject && !matchSubject(subject)) continue
+      results.push({
+        uid: msg.uid,
+        subject,
+        date: msg.envelope?.date || new Date(),
+        seen: msg.flags ? msg.flags.has('\\Seen') : false,
+      })
+    }
+
+    results.sort((a, b) => b.date.getTime() - a.date.getTime())
+    return results.slice(0, limit)
+  } finally {
+    try { await client.logout() } catch { /* ignore */ }
+  }
+}
+
+/**
+ * Fetch a single email by UID using its own IMAP connection.
+ */
+export async function fetchEmailByUidPublic(uid: number): Promise<FetchedEmail | null> {
+  const client = createClient()
+  try {
+    await client.connect()
+    await client.mailboxOpen('INBOX')
+    return await fetchEmailByUid(client, uid)
+  } finally {
+    try { await client.logout() } catch { /* ignore */ }
+  }
+}

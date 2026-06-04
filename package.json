@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "fetch-report": "npx ts-node --project tsconfig.scripts.json scripts/fetch-report.ts"
+    "fetch-report": "npx ts-node --project tsconfig.scripts.json scripts/fetch-report.ts",
+    "test:imap": "npx ts-node --project tsconfig.scripts.json scripts/test-imap.ts",
+    "test:parser": "npx ts-node --project tsconfig.scripts.json scripts/test-parser.ts"
   },
   "dependencies": {
     "@vercel/blob": "^2.4.0",
