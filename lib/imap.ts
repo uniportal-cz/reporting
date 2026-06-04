@@ -1,25 +1,17 @@
 import { ImapFlow } from 'imapflow'
-import { simpleParser, ParsedMail } from 'mailparser'
+import { simpleParser } from 'mailparser'
+import { format } from 'date-fns'
 
-export interface EmailSummary {
-  uid: number
-  subject: string
-  from: string
+export interface FetchedEmail {
+  html: string
   date: Date
-  seen: boolean
-  reportType: string
+  subject: string
 }
 
-export interface EmailDetail extends EmailSummary {
-  html: string | null
-  text: string | null
-  attachments: { filename: string; contentType: string; size: number }[]
-}
-
-function createClient() {
+function createClient(): ImapFlow {
   return new ImapFlow({
     host: process.env.IMAP_HOST!,
-    port: parseInt(process.env.IMAP_PORT || '993'),
+    port: parseInt(process.env.IMAP_PORT || '993', 10),
     secure: process.env.IMAP_SECURE !== 'false',
     auth: {
       user: process.env.IMAP_USER!,
@@ -32,99 +24,124 @@ function createClient() {
   })
 }
 
-function subjectToReportType(subject: string): string {
-  return subject?.trim() || 'Bez předmětu'
+/** Detect whether a subject looks like a report email */
+function isReportSubject(subject: string): boolean {
+  const s = subject.toLowerCase()
+  return (
+    s.includes('report') ||
+    s.includes('doprodej') ||
+    s.includes('dashboard') ||
+    s.includes('sportega') ||
+    /\d{4}-\d{2}-\d{2}/.test(s)
+  )
 }
 
-export async function fetchEmails(limit = 100): Promise<EmailSummary[]> {
+/**
+ * Fetch the most recent report email from INBOX.
+ */
+export async function fetchLatestReportEmail(): Promise<FetchedEmail | null> {
   const client = createClient()
-  const emails: EmailSummary[] = []
-
   try {
     await client.connect()
     const mailbox = await client.mailboxOpen('INBOX')
     const total = mailbox.exists
 
-    if (total === 0) {
-      return []
-    }
+    if (total === 0) return null
 
-    const start = Math.max(1, total - limit + 1)
+    // Scan last 50 messages for one that matches report subject
+    const start = Math.max(1, total - 49)
     const range = `${start}:*`
 
-    const messages = client.fetch(range, {
-      uid: true,
-      flags: true,
-      envelope: true,
-    })
+    type Candidate = { uid: number; date: Date; subject: string }
+    const candidates: Candidate[] = []
 
-    for await (const msg of messages) {
-      emails.push({
-        uid: msg.uid,
-        subject: msg.envelope?.subject || '',
-        from: msg.envelope?.from?.[0]?.address || '',
-        date: msg.envelope?.date || new Date(),
-        seen: msg.flags?.has('\\Seen') || false,
-        reportType: subjectToReportType(msg.envelope?.subject || ''),
-      })
+    for await (const msg of client.fetch(range, { uid: true, envelope: true })) {
+      const subject = msg.envelope?.subject || ''
+      if (isReportSubject(subject)) {
+        candidates.push({
+          uid: msg.uid,
+          date: msg.envelope?.date || new Date(),
+          subject,
+        })
+      }
     }
 
-    return emails.sort((a, b) => b.date.getTime() - a.date.getTime())
+    if (candidates.length === 0) {
+      // Fall back to the most recent message
+      const lastMsg = await fetchEmailBySeq(client, total)
+      return lastMsg
+    }
+
+    // Pick latest
+    candidates.sort((a, b) => b.date.getTime() - a.date.getTime())
+    const best = candidates[0]
+    return await fetchEmailByUid(client, best.uid)
   } finally {
-    try {
-      await client.logout()
-    } catch {
-      // ignore logout errors
-    }
+    try { await client.logout() } catch { /* ignore */ }
   }
 }
 
-export async function fetchEmailDetail(uid: number): Promise<EmailDetail | null> {
+/**
+ * Fetch a report email closest to the given target date.
+ */
+export async function fetchReportEmailByDate(targetDate: Date): Promise<FetchedEmail | null> {
   const client = createClient()
-
   try {
     await client.connect()
-    await client.mailboxOpen('INBOX')
+    const mailbox = await client.mailboxOpen('INBOX')
+    const total = mailbox.exists
 
-    let result: EmailDetail | null = null
+    if (total === 0) return null
 
-    for await (const msg of client.fetch(
-      [uid],
-      { uid: true, flags: true, envelope: true, source: true },
-      { uid: true }
-    )) {
-      const parsed = await simpleParser(msg.source as Buffer)
+    const targetStr = format(targetDate, 'yyyy-MM-dd')
+    const start = Math.max(1, total - 200)
+    const range = `${start}:*`
 
-      // Mark as seen
-      try {
-        await client.messageFlagsAdd([uid], ['\\Seen'], { uid: true })
-      } catch {
-        // ignore flag errors
-      }
+    type Candidate = { uid: number; date: Date; subject: string; diff: number }
+    const candidates: Candidate[] = []
 
-      result = {
-        uid: msg.uid,
-        subject: msg.envelope?.subject || '',
-        from: msg.envelope?.from?.[0]?.address || '',
-        date: msg.envelope?.date || new Date(),
-        seen: true,
-        reportType: subjectToReportType(msg.envelope?.subject || ''),
-        html: parsed.html || null,
-        text: parsed.text || null,
-        attachments: (parsed.attachments || []).map((a) => ({
-          filename: a.filename || 'příloha',
-          contentType: a.contentType,
-          size: a.size,
-        })),
-      }
+    for await (const msg of client.fetch(range, { uid: true, envelope: true })) {
+      const subject = msg.envelope?.subject || ''
+      const date = msg.envelope?.date || new Date()
+      if (!isReportSubject(subject)) continue
+      const diff = Math.abs(date.getTime() - targetDate.getTime())
+      candidates.push({ uid: msg.uid, date, subject, diff })
     }
 
-    return result
+    if (candidates.length === 0) return null
+
+    // Prefer exact date match, then closest
+    const exact = candidates.find((c) => format(c.date, 'yyyy-MM-dd') === targetStr)
+    const best = exact || candidates.sort((a, b) => a.diff - b.diff)[0]
+
+    return await fetchEmailByUid(client, best.uid)
   } finally {
-    try {
-      await client.logout()
-    } catch {
-      // ignore logout errors
+    try { await client.logout() } catch { /* ignore */ }
+  }
+}
+
+async function fetchEmailByUid(client: ImapFlow, uid: number): Promise<FetchedEmail | null> {
+  for await (const msg of client.fetch([uid], { uid: true, envelope: true, source: true }, { uid: true })) {
+    const parsed = await simpleParser(msg.source as Buffer)
+    const html = parsed.html || (parsed.textAsHtml ?? '') || ''
+    return {
+      html,
+      date: msg.envelope?.date || new Date(),
+      subject: msg.envelope?.subject || '',
     }
   }
+  return null
+}
+
+async function fetchEmailBySeq(client: ImapFlow, seq: number): Promise<FetchedEmail | null> {
+  for await (const msg of client.fetch(`${seq}:${seq}`, { uid: true, envelope: true, source: true })) {
+    const parsed = await simpleParser(msg.source as Buffer)
+    const html = parsed.html || (parsed.textAsHtml ?? '') || ''
+    return {
+      html,
+      date: msg.envelope?.date || new Date(),
+      subject: msg.envelope?.subject || '',
+    }
+  }
+  return null
 }

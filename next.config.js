@@ -1,7 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   experimental: {
-    serverComponentsExternalPackages: ['imapflow'],
+    serverComponentsExternalPackages: ['imapflow', 'mailparser'],
   },
 }
 module.exports = nextConfig
