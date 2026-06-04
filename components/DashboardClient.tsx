@@ -68,8 +68,11 @@ function CollapsibleSection({ title, badge, badgeColor = 'gray', children }: Col
 
 interface Props { report: Report; index: ReportIndex; activeType: string }
 
-export default function DashboardClient({ report, index, activeType }: Props) {
+export default function DashboardClient({ report: serverReport, index, activeType }: Props) {
   const router = useRouter()
+  // liveReport: set immediately from POST response, no DB round-trip needed
+  const [liveReport, setLiveReport] = useState<Report | null>(null)
+  const report = liveReport ?? serverReport
 
   const s = report.sections
   const kpi = report.kpi
@@ -120,9 +123,9 @@ export default function DashboardClient({ report, index, activeType }: Props) {
         <EmailBrowser
           activeType={activeType}
           loadedDates={index.reports.map(r => r.date)}
-          onReportLoaded={(date) => {
+          onReportLoaded={(date, fetchedReport) => {
+            setLiveReport(fetchedReport)
             router.push(`/dashboard?type=${activeType}&date=${date}`)
-            router.refresh()
           }}
         />
 

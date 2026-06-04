@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import type { Report } from '@/types/report'
 
 interface EmailSummary {
   uid: number
@@ -12,7 +13,7 @@ interface EmailSummary {
 interface Props {
   activeType: string
   loadedDates: string[]
-  onReportLoaded: (date: string) => void
+  onReportLoaded: (date: string, report: Report) => void
 }
 
 export default function EmailBrowser({ activeType, loadedDates, onReportLoaded }: Props) {
@@ -63,7 +64,7 @@ export default function EmailBrowser({ activeType, loadedDates, onReportLoaded }
         setFetchError(data.error || 'Chyba při stahování')
       } else {
         setSessionLoaded(prev => new Set(prev).add(selectedUid!))
-        onReportLoaded(data.date)
+        onReportLoaded(data.date, data.report)
       }
     } catch {
       setFetchError('Síťová chyba')

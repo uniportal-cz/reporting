@@ -59,6 +59,7 @@ export async function POST(req: Request) {
       reportType,
       subject: fetched.subject,
       kpi: report.kpi,
+      report,
     })
   } catch (error) {
     console.error('POST /api/fetch-report error:', error)
