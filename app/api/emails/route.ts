@@ -15,7 +15,7 @@ export async function GET(req: Request) {
     const emails = await listReportEmails(
       typeConfig?.subjectKeyword,
       typeConfig?.matchSubject,
-      50
+      10
     )
 
     return NextResponse.json(

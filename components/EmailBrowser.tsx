@@ -22,6 +22,8 @@ export default function EmailBrowser({ activeType, loadedDates, onReportLoaded }
   const [selectedUid, setSelectedUid] = useState<number | null>(null)
   const [fetching, setFetching] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
+  // track UIDs loaded in this session so badge shows immediately
+  const [sessionLoaded, setSessionLoaded] = useState<Set<number>>(new Set())
 
   const loadEmails = useCallback(async () => {
     setLoading(true)
@@ -60,6 +62,7 @@ export default function EmailBrowser({ activeType, loadedDates, onReportLoaded }
       if (!res.ok) {
         setFetchError(data.error || 'Chyba při stahování')
       } else {
+        setSessionLoaded(prev => new Set(prev).add(selectedUid!))
         onReportLoaded(data.date)
       }
     } catch {
@@ -122,34 +125,36 @@ export default function EmailBrowser({ activeType, loadedDates, onReportLoaded }
             {emails.map((email) => {
               const dateStr = email.date.slice(0, 10)
               const isSelected = email.uid === selectedUid
-              const isLoaded = loadedDates.includes(dateStr)
-              const shortSubject = email.subject.length > 30
-                ? email.subject.slice(0, 30) + '…'
-                : email.subject
+              const isLoaded = loadedDates.includes(dateStr) || sessionLoaded.has(email.uid)
 
               return (
                 <li key={email.uid}>
                   <button
                     onClick={() => setSelectedUid(email.uid === selectedUid ? null : email.uid)}
                     className={`w-full text-left px-3 py-2.5 border-b border-gray-50 transition-colors ${
-                      isSelected
-                        ? 'bg-blue-50 border-l-2 border-l-blue-500'
-                        : 'hover:bg-gray-50'
+                      isSelected ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-gray-50'
                     }`}
                   >
-                    <div className="flex items-center justify-between gap-1">
-                      <span className={`text-xs font-medium flex-1 truncate ${isSelected ? 'text-blue-700' : 'text-gray-700'}`}>
-                        {shortSubject}
+                    <div className="flex items-start justify-between gap-1">
+                      <span className={`text-xs font-medium leading-snug ${isSelected ? 'text-blue-700' : 'text-gray-700'}`}>
+                        {email.subject.length > 32 ? email.subject.slice(0, 32) + '…' : email.subject}
                       </span>
-                      {isLoaded && (
-                        <span title="Již načteno" className="flex-shrink-0">
-                          <svg className="w-3.5 h-3.5 text-green-500" fill="currentColor" viewBox="0 0 20 20">
-                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <span className="text-xs text-gray-400">{dateStr}</span>
+                      {isLoaded ? (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-green-100 px-1.5 py-0.5 text-xs font-medium text-green-700">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                           </svg>
+                          v DB
+                        </span>
+                      ) : (
+                        <span className="inline-flex rounded-full bg-gray-100 px-1.5 py-0.5 text-xs text-gray-400">
+                          nové
                         </span>
                       )}
                     </div>
-                    <div className="mt-0.5 text-xs text-gray-400">{dateStr}</div>
                   </button>
                 </li>
               )
