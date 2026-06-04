@@ -1,0 +1,27 @@
+{
+  "name": "dashboard-report",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "next": "14.2.5",
+    "react": "^18",
+    "react-dom": "^18",
+    "imapflow": "^1.0.162",
+    "mailparser": "^3.7.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^18",
+    "@types/react-dom": "^18",
+    "@types/mailparser": "^3.4.4",
+    "autoprefixer": "^10",
+    "postcss": "^8.5.10",
+    "tailwindcss": "^3",
+    "typescript": "^5"
+  }
+}
