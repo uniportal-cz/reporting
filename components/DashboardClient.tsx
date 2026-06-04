@@ -7,7 +7,7 @@ import { REPORT_TYPES } from '@/lib/report-types'
 import type { StorageStatus } from '@/app/dashboard/page'
 import { format, parseISO, isValid } from 'date-fns'
 import { cs } from 'date-fns/locale'
-import EmailBrowser from './EmailBrowser'
+import EmailBrowser, { type EmailSummary } from './EmailBrowser'
 
 const Section1 = lazy(() => import('./sections/Section1'))
 const Section2 = lazy(() => import('./sections/Section2'))
@@ -86,9 +86,44 @@ interface Props { report: Report; index: ReportIndex; activeType: string; storag
 
 export default function DashboardClient({ report: serverReport, index, activeType, storageStatus }: Props) {
   const router = useRouter()
-  // liveReport: set immediately from POST response, no DB round-trip needed
   const [liveReport, setLiveReport] = useState<Report | null>(null)
   const report = liveReport ?? serverReport
+
+  const [selectedEmail, setSelectedEmail] = useState<EmailSummary | null>(null)
+  const [fetching, setFetching] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [loadedUids, setLoadedUids] = useState<Set<number>>(new Set())
+
+  function handleEmailClick(email: EmailSummary) {
+    setSelectedEmail(prev => prev?.uid === email.uid ? null : email)
+    setFetchError(null)
+  }
+
+  async function handleLoadReport() {
+    if (!selectedEmail) return
+    setFetching(true)
+    setFetchError(null)
+    try {
+      const res = await fetch('/api/fetch-report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ uid: selectedEmail.uid, reportType: activeType }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        setFetchError(data.error || 'Chyba při stahování')
+      } else {
+        setLoadedUids(prev => new Set(prev).add(selectedEmail.uid))
+        setLiveReport(data.report)
+        setSelectedEmail(null)
+        router.push(`/dashboard?type=${activeType}&date=${data.date}`)
+      }
+    } catch {
+      setFetchError('Síťová chyba')
+    } finally {
+      setFetching(false)
+    }
+  }
 
   const s = report.sections
   const kpi = report.kpi
@@ -163,13 +198,56 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
         <EmailBrowser
           activeType={activeType}
           loadedDates={index.reports.map(r => r.date)}
-          onReportLoaded={(date, fetchedReport) => {
-            setLiveReport(fetchedReport)
-            router.push(`/dashboard?type=${activeType}&date=${date}`)
-          }}
+          loadedUids={loadedUids}
+          selectedUid={selectedEmail?.uid ?? null}
+          onEmailClick={handleEmailClick}
         />
 
-        {/* Main content */}
+        {/* Main content — three states: loading / ready-to-fetch / report */}
+        {fetching ? (
+          <div className="flex flex-1 items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <div className="relative mx-auto mb-5 w-16 h-16">
+                <svg className="w-16 h-16 animate-spin text-blue-200" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+                <svg className="absolute inset-0 m-auto w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              </div>
+              <p className="text-sm font-semibold text-gray-700">Načítám report…</p>
+              <p className="mt-1 text-xs text-gray-400 max-w-xs">{selectedEmail?.subject}</p>
+            </div>
+          </div>
+        ) : selectedEmail ? (
+          <div className="flex flex-1 items-center justify-center bg-gray-50">
+            <div className="w-full max-w-sm rounded-2xl border border-gray-200 bg-white p-8 shadow-sm text-center">
+              <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-blue-50">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <p className="text-xs text-gray-400 mb-1">{selectedEmail.date.slice(0, 10)}</p>
+              <h3 className="text-sm font-semibold text-gray-800 mb-5 leading-snug">{selectedEmail.subject}</h3>
+              {fetchError && (
+                <p className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-xs text-red-600">{fetchError}</p>
+              )}
+              <button
+                onClick={handleLoadReport}
+                className="w-full rounded-xl bg-blue-600 px-4 py-3 text-sm font-semibold text-white hover:bg-blue-700 transition-colors"
+              >
+                Načíst report
+              </button>
+              <button
+                onClick={() => { setSelectedEmail(null); setFetchError(null) }}
+                className="mt-2 w-full rounded-xl px-4 py-2 text-xs text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                Zrušit
+              </button>
+            </div>
+          </div>
+        ) : (
         <main className="flex-1 overflow-y-auto">
           {/* Report header */}
           <div className="border-b border-gray-200 bg-white px-6 py-3">
@@ -300,6 +378,7 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
             </div>
           </div>
         </main>
+        )}
       </div>
     </div>
   )
