@@ -376,48 +376,95 @@ function parseSection4($: CheerioAPI): Section4 | undefined {
     ])
     if (!heading) return undefined
 
-    const headingText = heading.text()
     const content = collectSectionContent($, heading)
-    const tables = findTables($, content)
+    const allText = content.map((el) => el.text()).join('\n')
 
-    if (tables.length === 0) {
-      // single table with country column
-      const table = findTable($, content)
-      if (!table) return { zeme: [] }
-      const rows = parseTable($, table)
-      const byZeme: Record<string, { id: string; typ: string; nazev: string; skupina: string; admin: string }[]> = {}
-      for (const r of rows) {
-        const z = r['Země'] || r['zeme'] || r['Country'] || r['0'] || 'Neznámá'
-        if (!byZeme[z]) byZeme[z] = []
-        byZeme[z].push({
-          id: r['ID'] || r['Kód'] || r['1'] || '',
-          typ: r['Typ'] || r['2'] || '',
-          nazev: r['Název'] || r['3'] || '',
-          skupina: r['Skupina'] || r['4'] || '',
-          admin: r['Admin'] || r['5'] || '',
-        })
+    let total = extractCount(heading.text())
+    const celkemMatch = /celkem\s+produkt[ůu][:\s]+\(?(\d+)\)?/i.exec(allText)
+    if (celkemMatch) total = parseInt(celkemMatch[1], 10)
+
+    const countries: Section4['countries'] = {}
+    // Country codes: 2-4 uppercase ASCII letters alone on a line/element
+    const countryRe = /^([A-Z]{2,4})$/
+    // Product line: "1234567  typToken  Název produktu  15 | skupina  AdminToken"
+    const productRe = /^(\d+)\s+(\S+)\s+(.+?)\s+(\d+)\s*\|\s*(.+?)\s+(\S+)$/
+
+    const normalizeAdmin = (s: string) => s.replace(/([a-z])([A-Z])/g, '$1 $2')
+
+    const ensureCountry = (code: string) => {
+      if (!countries[code]) countries[code] = { count: 0, products: [] }
+    }
+
+    const addProduct = (country: string, id: string, typ: string, nazev: string, skupina: string, admin: string, url?: string) => {
+      ensureCountry(country)
+      countries[country].products.push({ id, typ, nazev: nazev.trim(), skupina: skupina.trim(), admin: normalizeAdmin(admin), url })
+    }
+
+    let currentCountry: string | null = null
+
+    for (const el of content) {
+      const tag = (el[0] as Element)?.tagName?.toLowerCase()
+      const elText = el.text().trim()
+
+      // Whole element is a country code
+      if (countryRe.test(elText)) {
+        currentCountry = elText; ensureCountry(currentCountry); continue
       }
-      return {
-        zeme: Object.entries(byZeme).map(([zeme, produkty]) => ({ zeme, produkty })),
+
+      // Table: scan rows for country-divider rows and product rows
+      if (tag === 'table') {
+        el.find('tr').each((_, tr) => {
+          const cells: string[] = []
+          $(tr).find('td, th').each((_, td) => { cells.push($(td).text().trim()) })
+          const nonEmpty = cells.filter(Boolean)
+          if (nonEmpty.length === 1 && countryRe.test(nonEmpty[0])) {
+            currentCountry = nonEmpty[0]; ensureCountry(currentCountry)
+          } else if (currentCountry && nonEmpty.length >= 3 && /^\d+$/.test(cells[0] || '')) {
+            const url = $(tr).find('a[href]').first().attr('href') || undefined
+            addProduct(currentCountry, cells[0], cells[1] || '', cells[2] || '', cells[3] || '', cells[4] || cells[cells.length - 1] || '', url)
+          }
+        })
+        continue
+      }
+
+      // List items
+      if (el.find('li').length) {
+        el.find('li').each((_, li) => {
+          const t = $(li).text().trim()
+          if (countryRe.test(t)) { currentCountry = t; ensureCountry(currentCountry!); return }
+          if (!currentCountry) return
+          const m = productRe.exec(t)
+          if (m) {
+            const url = $(li).find('a[href]').first().attr('href') || undefined
+            addProduct(currentCountry, m[1], m[2], m[3], `${m[4]} | ${m[5].trim()}`, m[6], url)
+          }
+        })
+        continue
+      }
+
+      // Plain text block — scan line by line
+      const lines = elText.split('\n').map((l) => l.trim()).filter(Boolean)
+      for (const line of lines) {
+        if (countryRe.test(line)) { currentCountry = line; ensureCountry(currentCountry); continue }
+        if (!currentCountry) continue
+        const m = productRe.exec(line)
+        if (m) addProduct(currentCountry, m[1], m[2], m[3], `${m[4]} | ${m[5].trim()}`, m[6])
       }
     }
 
-    // Tables per country
-    const zeme = tables.map((t, i) => {
-      const zemeEl = t.prev('h3, h4, b, strong, p')
-      const zemeText = zemeEl.text().trim() || extractCount(headingText).toString() || `Země ${i + 1}`
-      const rows = parseTable($, t)
-      const produkty = rows.map((r) => ({
-        id: r['ID'] || r['Kód'] || r['0'] || '',
-        typ: r['Typ'] || r['1'] || '',
-        nazev: r['Název'] || r['2'] || '',
-        skupina: r['Skupina'] || r['3'] || '',
-        admin: r['Admin'] || r['4'] || '',
-      }))
-      return { zeme: zemeText, produkty }
-    })
+    for (const c of Object.values(countries)) c.count = c.products.length
+    if (total === 0) total = Object.values(countries).reduce((s, c) => s + c.count, 0)
 
-    return { zeme }
+    const byType: Record<string, number> = {}
+    const byGroup: Record<string, number> = {}
+    for (const c of Object.values(countries)) {
+      for (const p of c.products) {
+        byType[p.typ || 'Neznámý'] = (byType[p.typ || 'Neznámý'] || 0) + 1
+        byGroup[p.skupina || 'Neznámá'] = (byGroup[p.skupina || 'Neznámá'] || 0) + 1
+      }
+    }
+
+    return { total, countries, stats: { byType, byGroup } }
   } catch (e) {
     console.error('parseSection4 error:', e)
     return undefined
@@ -686,7 +733,7 @@ function parseSection15($: CheerioAPI): Section15 | undefined {
 function computeKPI(sections: ReportSections): ReportKPI {
   return {
     sec1_count: sections.sec1?.total ?? sections.sec1?.sample.length ?? 0,
-    sec4_count: sections.sec4?.zeme.reduce((sum, z) => sum + z.produkty.length, 0) ?? 0,
+    sec4_count: sections.sec4?.total ?? 0,
     sec14_count: sections.sec14?.skupiny.reduce((sum, s) => sum + s.produkty.length, 0) ?? 0,
     sec13_count: sections.sec13?.items.length ?? 0,
     sec9_terms: sections.sec9?.terminy.length ?? 0,

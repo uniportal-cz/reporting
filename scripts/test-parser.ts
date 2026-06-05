@@ -46,7 +46,7 @@ async function main() {
   console.log(`sec1  (Doprodej bez zásoby):      ${status(!!s.sec1, s.sec1?.sample.length)}`)
   console.log(`sec2  (Saleable bez dodavatele):   ${status(!!s.sec2, s.sec2?.sample.length)}`)
   console.log(`sec3  (WithVariant rozdílná cena): ${status(!!s.sec3, s.sec3?.uniqueCount)}`)
-  console.log(`sec4  (Nelze doručit):             ${status(!!s.sec4, s.sec4?.zeme.reduce((n, z) => n + z.produkty.length, 0))}`)
+  console.log(`sec4  (Nelze doručit):             ${status(!!s.sec4, s.sec4?.total)}`)
   console.log(`sec7  (Dárek není skladem):        ${status(!!s.sec7, s.sec7?.items.length)}`)
   console.log(`sec9  (Objednány k likvidaci):     ${status(!!s.sec9, s.sec9?.items.length)}`)
   console.log(`sec11 (Mimo saleable):             ${status(!!s.sec11, s.sec11?.items.length)}`)

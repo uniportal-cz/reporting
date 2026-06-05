@@ -34,9 +34,9 @@ function sectionToCsv(report: Report, section: string): string {
     }
     case '4': {
       const rows: Record<string, string>[] = []
-      for (const z of s.sec4?.zeme ?? []) {
-        for (const p of z.produkty) {
-          rows.push({ Země: z.zeme, ID: p.id, Typ: p.typ, Název: p.nazev, Skupina: p.skupina, Admin: p.admin })
+      for (const [code, c] of Object.entries(s.sec4?.countries ?? {})) {
+        for (const p of c.products) {
+          rows.push({ Země: code, ID: p.id, Typ: p.typ, Název: p.nazev, Skupina: p.skupina, Admin: p.admin })
         }
       }
       return Papa.unparse(rows)

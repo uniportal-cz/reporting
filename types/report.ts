@@ -55,8 +55,13 @@ export interface Section3 {
 }
 
 // Sec 4: Nelze doručit
+export interface Section4Product {
+  id: string; typ: string; nazev: string; skupina: string; admin: string; url?: string
+}
 export interface Section4 {
-  zeme: { zeme: string; produkty: { id: string; typ: string; nazev: string; skupina: string; admin: string }[] }[]
+  total: number
+  countries: Record<string, { count: number; products: Section4Product[] }>
+  stats: { byType: Record<string, number>; byGroup: Record<string, number> }
 }
 
 // Sec 7: Dárek není skladem
