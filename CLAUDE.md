@@ -90,7 +90,7 @@ Key helpers in `lib/parser.ts`:
 
 `EmailBrowser.tsx` is a pure listing component — it emits `onEmailClick` and receives `selectedUid` / `loadedUids` from the parent. It has no fetching logic.
 
-Section components (`components/sections/Section*.tsx`) are lazy-loaded and only rendered when the collapsible is opened. Each section is always rendered in `DashboardClient` — empty sections show a green "V pořádku" state instead of being hidden.
+Section components (`components/sections/Section*.tsx`) are lazy-loaded and only rendered when the collapsible is opened. Each section is always rendered in `DashboardClient` — empty sections show a green "V pořádku" state instead of being hidden. Section components use two shared hooks: `useTableFilter` (text search over a list of objects by specified keys) and `useTableSort` (column sort with Czech locale collation). `StatBars` renders a horizontal bar chart from a `Record<string, number>` — pass `title` (not `label`).
 
 The dashboard header shows a scrollable 15-chip KPI bar (one chip per section) with delta indicators vs. the previous report of the same type.
 
