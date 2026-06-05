@@ -9,6 +9,9 @@ npm run dev          # start Next.js dev server (localhost:3000)
 npm run build        # production build
 npm run test:imap    # connect to IMAP, list last 20 emails, mark matches (needs .env.local)
 npm run test:parser  # download first matching email and print per-section parse counts
+npx tsx scripts/test-sections.ts      # run all section parser unit tests (no IMAP needed)
+npx tsx scripts/save-email-html.ts    # save latest report email HTML to data/debug-email.html
+npx tsx scripts/save-email-html.ts <UID>  # save specific email by IMAP UID
 ```
 
 There are no automated tests. TypeScript is the primary correctness check — always run `npx tsc --noEmit` after changes.
@@ -55,22 +58,41 @@ All routes use `runtime = 'nodejs'` (required for `imapflow` / `mailparser` whic
 - `POST /api/fetch-report` — accepts `{ uid, reportType }`, fetches email from IMAP by UID, parses it, saves to storage, returns the full `Report` object. The client displays from the response directly (no DB round-trip).
 - `GET /api/emails?type=X` — lists last 10 matching emails from IMAP (envelope only, no body download).
 - `GET /api/reports/[date]` — loads a saved report from storage.
+- `GET /api/reports/[date]/export?section=N` — CSV export for a section (sections 1–15 supported).
 - `GET /api/debug/storage` — storage health check with write/read round-trip.
 - `GET /api/debug/parse?uid=XXX` — fetches email HTML and returns headings/tables for parser debugging.
 
 ### Parser
 
-`lib/parser.ts` uses Cheerio to parse the email HTML heuristically. It searches for section headings by regex patterns, then extracts the nearest table. Each section is wrapped in its own try/catch so a parse failure in one section doesn't break others. The parser was built without access to live email samples — use `/api/debug/parse?uid=XXX` with a real UID to inspect heading text and table structure when fixing parse issues.
+`lib/parser.ts` uses Cheerio to parse the email HTML heuristically. It searches for section headings by regex patterns, then extracts the nearest table. Each section is wrapped in its own try/catch so a parse failure in one section doesn't break others.
+
+Currently parsed sections: 1–6, 7, 8, 9, 10, 11, 12, 13, 14, 15. Sections 5, 6, 8, 10 are newer and may not appear in all email types.
+
+**Parser debugging workflow:**
+1. Run `npx tsx scripts/save-email-html.ts [UID]` to save the raw HTML
+2. Open `data/debug-email.html` in a browser and inspect `<h2>` heading text
+3. Update heading patterns in the relevant `parseSection*` function
+4. Verify with `npx tsx scripts/test-sections.ts`
+
+Key helpers in `lib/parser.ts`:
+- `findHeading($, patterns)` — searches `h1–h5, strong, b, td[colspan], th` by string or regex
+- `collectSectionContent($, heading)` — collects sibling elements after heading until next heading of same/higher level
+- `findBulletLines` / `findTable` / `findTables` — extract data from collected content
 
 ### Client architecture
 
 `DashboardClient.tsx` owns all interaction state:
 - `liveReport` — set from POST response immediately, avoiding a DB round-trip after loading
 - `selectedEmail` / `fetching` / `fetchError` — drives the three main-area states (report / ready-to-load card / loading animation)
+- `storedEmailUid` — UID of the email for the currently-viewed stored report; enables the "Znovu stáhnout" re-fetch button in the report header
+
+**Email navigation logic:** clicking a "v DB" email in the sidebar navigates directly to the stored report (`router.push`) — no load card shown. Clicking an email not yet in storage shows the fetch card. The "Znovu stáhnout" button in the report header allows forced re-fetch/re-parse from IMAP for already-stored reports.
 
 `EmailBrowser.tsx` is a pure listing component — it emits `onEmailClick` and receives `selectedUid` / `loadedUids` from the parent. It has no fetching logic.
 
 Section components (`components/sections/Section*.tsx`) are lazy-loaded and only rendered when the collapsible is opened. Each section is always rendered in `DashboardClient` — empty sections show a green "V pořádku" state instead of being hidden.
+
+The dashboard header shows a scrollable 15-chip KPI bar (one chip per section) with delta indicators vs. the previous report of the same type.
 
 ### Compare page
 
