@@ -33,13 +33,17 @@ function sectionToCsv(report: Report, section: string): string {
       return Papa.unparse(items.map((i) => ({ ID: i.id, Název: i.nazev, Ceník: i.cenik, 'Skupina ID': i.skupina_id, Skupina: i.skupina_nazev, Admin: i.admin })))
     }
     case '4': {
-      const rows: Record<string, string>[] = []
-      for (const [code, c] of Object.entries(s.sec4?.countries ?? {})) {
-        for (const p of c.products) {
-          rows.push({ Země: code, ID: p.id, Typ: p.typ, Název: p.nazev, Skupina: p.skupina, Admin: p.admin })
-        }
-      }
-      return Papa.unparse(rows)
+      const items = s.sec4?.products ?? []
+      return Papa.unparse(
+        items.map((p) => ({
+          ID: p.id,
+          Typ: p.typ,
+          Název: p.nazev,
+          Skupina: p.skupina,
+          Admin: p.admin,
+          Země: p.countries.join(', '),
+        }))
+      )
     }
     case '7': {
       const items = s.sec7?.items ?? []

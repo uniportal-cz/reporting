@@ -57,10 +57,13 @@ export interface Section3 {
 // Sec 4: Nelze doručit
 export interface Section4Product {
   id: string; typ: string; nazev: string; skupina: string; admin: string; url?: string
+  countries: string[]
 }
 export interface Section4 {
-  total: number
-  countries: Record<string, { count: number; products: Section4Product[] }>
+  totalRaw: number
+  totalUnique: number
+  products: Section4Product[]
+  countryCounts: Record<string, number>
   stats: { byType: Record<string, number>; byGroup: Record<string, number> }
 }
 

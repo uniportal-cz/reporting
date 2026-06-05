@@ -9,6 +9,7 @@ import {
   Section2,
   Section3,
   Section4,
+  Section4Product,
   Section7,
   Section9,
   Section11,
@@ -263,39 +264,88 @@ function parseSection2($: CheerioAPI): Section2 | undefined {
       /2[\.\)]\s*(saleable|dodavatel)/i,
       'saleable bez dodavatelského',
       'bez dodavatelského skladu',
+      'dodavatelském skladu',
     ])
     if (!heading) return undefined
 
     const content = collectSectionContent($, heading)
     const sample: Section2['sample'] = []
-    const tables = findTables($, content)
+    const normalizeAdmin = (s: string) => s.replace(/([a-z])([A-Z])/g, '$1 $2')
 
     const addRows = (entries: { row: Record<string, string>; url?: string }[], dodavatelOverride?: string) => {
       for (const { row: r, url } of entries) {
-        const kod = r['Kód'] || r['kod'] || r['1'] || r['0'] || ''
-        if (!kod || /celkem/i.test(kod)) continue  // skip subtotal rows
+        const kod = r['Kód'] || r['kod'] || r['1'] || ''
+        // Skip repeated header rows (kod is literally "Kód") and subtotal rows ("celkem")
+        if (!kod || /^kód?$/i.test(kod) || /celkem/i.test(kod)) continue
+        // Skip subtotal rows where the dodavatel cell contains "celkem N záznamů"
+        const dodavatel = dodavatelOverride || r['Dodavatel'] || r['dodavatel'] || r['0'] || ''
+        if (/celkem\s+\d+/i.test(dodavatel)) continue
+
+        const sklademStr = r['Skladem u dodavatele'] || r['Skladem'] || r['5'] || r['skladem'] || ''
         sample.push({
-          dodavatel: dodavatelOverride || r['Dodavatel'] || r['dodavatel'] || r['0'] || '',
+          dodavatel,
           kod,
-          nazev: r['Název'] || r['2'] || '',
+          nazev: r['Název'] || r['Nazev'] || r['2'] || '',
           skupina: r['Skupina'] || r['3'] || '',
-          admin: r['Admin'] || r['4'] || '',
-          skladem: parseNum(r['Skladem u dodavatele'] || r['Skladem'] || r['5'] || '0'),
+          admin: normalizeAdmin(r['Admin'] || r['4'] || ''),
+          skladem: sklademStr ? parseNum(sklademStr) : 0,
           url,
         })
       }
     }
 
+    const tables = findTables($, content)
     if (tables.length === 0) {
       const table = findTable($, content)
       if (table) addRows(parseTableWithUrls($, table))
     } else if (tables.length === 1) {
       addRows(parseTableWithUrls($, tables[0]))
     } else {
-      // Multiple tables — each headed by a supplier name
       for (const t of tables) {
         const prevText = t.prev('h3, h4, b, strong, p').text().trim()
         addRows(parseTableWithUrls($, t), prevText || undefined)
+      }
+    }
+
+    // Text-based fallback when the table approach yields nothing
+    if (sample.length === 0) {
+      const lines = content
+        .map((el) => el.text())
+        .join('\n')
+        .split('\n')
+        .map((s) => s.trim())
+        .filter(Boolean)
+
+      for (const line of lines) {
+        if (/^dodavatel\s+kód/i.test(line)) continue
+        if (/celkem\s+\d+\s+záznam/i.test(line)) continue
+        if (/^vygenerováno/i.test(line)) continue
+
+        // Anchor on group pattern "NN | name" then extract code and company before it
+        const gm = /\s(\d{1,3}\s*\|\s*\S[^\n]*?)\s{2,}(\S+(?:\s+\S+)?)\s*(-?[\d]+\.?[\d]*)?\s*$/.exec(line)
+        if (!gm) continue
+
+        const before = line.substring(0, line.length - gm[0].length).trim()
+        const skupina = gm[1].trim()
+        const admin = gm[2].trim()
+        const skladem = gm[3] ? parseNum(gm[3]) : 0
+
+        // Code is the first numeric token after the company name
+        const cm = /\s+([\d][\d.-]*)\s+(.+)$/.exec(before)
+        if (!cm) continue
+
+        const dodavatel = before.substring(0, before.length - cm[0].length).trim()
+        if (!dodavatel || !cm[1]) continue
+
+        sample.push({
+          dodavatel,
+          kod: cm[1],
+          nazev: cm[2].trim(),
+          skupina,
+          admin: normalizeAdmin(admin),
+          skladem,
+          url: undefined,
+        })
       }
     }
 
@@ -377,94 +427,92 @@ function parseSection4($: CheerioAPI): Section4 | undefined {
     if (!heading) return undefined
 
     const content = collectSectionContent($, heading)
-    const allText = content.map((el) => el.text()).join('\n')
 
-    let total = extractCount(heading.text())
-    const celkemMatch = /celkem\s+produkt[ůu][:\s]+\(?(\d+)\)?/i.exec(allText)
-    if (celkemMatch) total = parseInt(celkemMatch[1], 10)
-
-    const countries: Section4['countries'] = {}
-    // Country codes: 2-4 uppercase ASCII letters alone on a line/element
     const countryRe = /^([A-Z]{2,4})$/
-    // Product line: "1234567  typToken  Název produktu  15 | skupina  AdminToken"
     const productRe = /^(\d+)\s+(\S+)\s+(.+?)\s+(\d+)\s*\|\s*(.+?)\s+(\S+)$/
-
     const normalizeAdmin = (s: string) => s.replace(/([a-z])([A-Z])/g, '$1 $2')
 
-    const ensureCountry = (code: string) => {
-      if (!countries[code]) countries[code] = { count: 0, products: [] }
-    }
-
-    const addProduct = (country: string, id: string, typ: string, nazev: string, skupina: string, admin: string, url?: string) => {
-      ensureCountry(country)
-      countries[country].products.push({ id, typ, nazev: nazev.trim(), skupina: skupina.trim(), admin: normalizeAdmin(admin), url })
-    }
-
+    const productsMap = new Map<string, Section4Product>()
+    const countryCounts: Record<string, number> = {}
     let currentCountry: string | null = null
+    let totalRaw = 0
+
+    const setCountry = (code: string) => {
+      currentCountry = code
+      if (countryCounts[code] === undefined) countryCounts[code] = 0
+    }
+
+    const addProduct = (id: string, typ: string, nazev: string, skupina: string, admin: string, url?: string) => {
+      if (!currentCountry) return
+      countryCounts[currentCountry] = (countryCounts[currentCountry] || 0) + 1
+      totalRaw++
+      if (productsMap.has(id)) {
+        const p = productsMap.get(id)!
+        if (!p.countries.includes(currentCountry)) p.countries.push(currentCountry)
+        if (!p.url && url) p.url = url
+      } else {
+        productsMap.set(id, {
+          id, typ, nazev: nazev.trim(), skupina: skupina.trim(),
+          admin: normalizeAdmin(admin), url, countries: [currentCountry],
+        })
+      }
+    }
 
     for (const el of content) {
       const tag = (el[0] as Element)?.tagName?.toLowerCase()
       const elText = el.text().trim()
 
-      // Whole element is a country code
-      if (countryRe.test(elText)) {
-        currentCountry = elText; ensureCountry(currentCountry); continue
-      }
+      if (countryRe.test(elText)) { setCountry(elText); continue }
 
-      // Table: scan rows for country-divider rows and product rows
       if (tag === 'table') {
         el.find('tr').each((_, tr) => {
           const cells: string[] = []
           $(tr).find('td, th').each((_, td) => { cells.push($(td).text().trim()) })
           const nonEmpty = cells.filter(Boolean)
           if (nonEmpty.length === 1 && countryRe.test(nonEmpty[0])) {
-            currentCountry = nonEmpty[0]; ensureCountry(currentCountry)
+            setCountry(nonEmpty[0])
           } else if (currentCountry && nonEmpty.length >= 3 && /^\d+$/.test(cells[0] || '')) {
             const url = $(tr).find('a[href]').first().attr('href') || undefined
-            addProduct(currentCountry, cells[0], cells[1] || '', cells[2] || '', cells[3] || '', cells[4] || cells[cells.length - 1] || '', url)
+            addProduct(cells[0], cells[1] || '', cells[2] || '', cells[3] || '', cells[4] || cells[cells.length - 1] || '', url)
           }
         })
         continue
       }
 
-      // List items
       if (el.find('li').length) {
         el.find('li').each((_, li) => {
           const t = $(li).text().trim()
-          if (countryRe.test(t)) { currentCountry = t; ensureCountry(currentCountry!); return }
+          if (countryRe.test(t)) { setCountry(t); return }
           if (!currentCountry) return
           const m = productRe.exec(t)
           if (m) {
             const url = $(li).find('a[href]').first().attr('href') || undefined
-            addProduct(currentCountry, m[1], m[2], m[3], `${m[4]} | ${m[5].trim()}`, m[6], url)
+            addProduct(m[1], m[2], m[3], `${m[4]} | ${m[5].trim()}`, m[6], url)
           }
         })
         continue
       }
 
-      // Plain text block — scan line by line
       const lines = elText.split('\n').map((l) => l.trim()).filter(Boolean)
       for (const line of lines) {
-        if (countryRe.test(line)) { currentCountry = line; ensureCountry(currentCountry); continue }
+        if (countryRe.test(line)) { setCountry(line); continue }
         if (!currentCountry) continue
         const m = productRe.exec(line)
-        if (m) addProduct(currentCountry, m[1], m[2], m[3], `${m[4]} | ${m[5].trim()}`, m[6])
+        if (m) addProduct(m[1], m[2], m[3], `${m[4]} | ${m[5].trim()}`, m[6])
       }
     }
 
-    for (const c of Object.values(countries)) c.count = c.products.length
-    if (total === 0) total = Object.values(countries).reduce((s, c) => s + c.count, 0)
+    const products = Array.from(productsMap.values())
+    const totalUnique = products.length
 
     const byType: Record<string, number> = {}
     const byGroup: Record<string, number> = {}
-    for (const c of Object.values(countries)) {
-      for (const p of c.products) {
-        byType[p.typ || 'Neznámý'] = (byType[p.typ || 'Neznámý'] || 0) + 1
-        byGroup[p.skupina || 'Neznámá'] = (byGroup[p.skupina || 'Neznámá'] || 0) + 1
-      }
+    for (const p of products) {
+      byType[p.typ || 'Neznámý'] = (byType[p.typ || 'Neznámý'] || 0) + 1
+      byGroup[p.skupina || 'Neznámá'] = (byGroup[p.skupina || 'Neznámá'] || 0) + 1
     }
 
-    return { total, countries, stats: { byType, byGroup } }
+    return { totalRaw, totalUnique, products, countryCounts, stats: { byType, byGroup } }
   } catch (e) {
     console.error('parseSection4 error:', e)
     return undefined
@@ -544,8 +592,10 @@ function parseSection9($: CheerioAPI): Section9 | undefined {
 function parseSection11($: CheerioAPI): Section11 | undefined {
   try {
     const heading = findHeading($, [
-      /11[\.\)]\s*(mimo saleable|saleable)/i,
+      /11[\.\)]\s*(mimo saleable|saleable|počet)/i,
+      /11[\.\)].*(saleable|mimo prodejní)/i,
       'mimo saleable',
+      'mimo prodejní režim',
     ])
     if (!heading) return undefined
 
@@ -606,7 +656,9 @@ function parseSection13($: CheerioAPI): Section13 | undefined {
   try {
     const heading = findHeading($, [
       /13[\.\)]\s*(saleable bez kategorie|bez kategorie)/i,
+      /13[\.\)].*(bez kategorie)/i,
       'saleable bez kategorie',
+      'bez kategorie',
     ])
     if (!heading) return undefined
 
@@ -637,7 +689,10 @@ function parseSection14($: CheerioAPI): Section14 | undefined {
   try {
     const heading = findHeading($, [
       /14[\.\)]\s*(záporná|zaporna|marže)/i,
+      /14[\.\)].*(zápornou|záporná|zaporna|marž)/i,
       'záporná marže',
+      'zápornou marží',
+      'zápornou',
     ])
     if (!heading) return undefined
 
@@ -733,7 +788,7 @@ function parseSection15($: CheerioAPI): Section15 | undefined {
 function computeKPI(sections: ReportSections): ReportKPI {
   return {
     sec1_count: sections.sec1?.total ?? sections.sec1?.sample.length ?? 0,
-    sec4_count: sections.sec4?.total ?? 0,
+    sec4_count: sections.sec4?.totalUnique ?? 0,
     sec14_count: sections.sec14?.skupiny.reduce((sum, s) => sum + s.produkty.length, 0) ?? 0,
     sec13_count: sections.sec13?.items.length ?? 0,
     sec9_terms: sections.sec9?.terminy.length ?? 0,
