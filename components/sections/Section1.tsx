@@ -69,7 +69,11 @@ export default function Section1({ data, date }: Props) {
           <tbody className="divide-y divide-gray-100">
             {sorted.map((item, i) => (
               <tr key={i} className="hover:bg-gray-50">
-                <td className="px-3 py-2 font-mono text-xs text-gray-600">{item.id}</td>
+                <td className="px-3 py-2 font-mono text-xs">
+                  {item.url
+                    ? <a href={item.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{item.id}</a>
+                    : <span className="text-gray-600">{item.id}</span>}
+                </td>
                 <td className="px-3 py-2 text-gray-600">{item.typ}</td>
                 <td className="px-3 py-2 font-medium">{item.nazev}</td>
                 <td className="px-3 py-2 text-gray-600">{item.skupina_id ? `${item.skupina_id} | ${item.skupina_nazev}` : item.skupina_nazev}</td>

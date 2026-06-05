@@ -147,20 +147,52 @@ function findListItems($: CheerioAPI, elements: Cheerio<AnyNode>[]): string[] {
 }
 
 /** Extract bullet/list lines from content elements — handles <li>, and <p>/<div> starting with • */
-function findBulletLines($: CheerioAPI, elements: Cheerio<AnyNode>[]): string[] {
-  const lines: string[] = []
+function findBulletLines($: CheerioAPI, elements: Cheerio<AnyNode>[]): { text: string; url?: string }[] {
+  const lines: { text: string; url?: string }[] = []
   for (const el of elements) {
-    el.find('li').each((_, li) => { const t = $(li).text().trim(); if (t) lines.push(t) })
+    el.find('li').each((_, li) => {
+      const t = $(li).text().trim()
+      if (!t) return
+      const url = $(li).find('a[href]').first().attr('href') || undefined
+      lines.push({ text: t, url })
+    })
     el.find('p, div, td').each((_, p) => {
       const t = $(p).text().trim()
-      if (t.startsWith('•') || t.startsWith('•') || t.startsWith('·')) {
-        lines.push(t.replace(/^[•·•]\s*/, ''))
+      if (t.startsWith('•') || t.startsWith('·')) {
+        const url = $(p).find('a[href]').first().attr('href') || undefined
+        lines.push({ text: t.replace(/^[•·]\s*/, ''), url })
       }
     })
     const tag = (el[0] as Element)?.tagName?.toLowerCase()
-    if (tag === 'li') { const t = el.text().trim(); if (t) lines.push(t) }
+    if (tag === 'li') {
+      const t = el.text().trim()
+      const url = el.find('a[href]').first().attr('href') || undefined
+      if (t) lines.push({ text: t, url })
+    }
   }
-  return lines.filter(Boolean)
+  return lines.filter(({ text }) => Boolean(text))
+}
+
+/** Like parseTable but also captures the first href found in each row */
+function parseTableWithUrls($: CheerioAPI, tableEl: Cheerio<AnyNode>): { row: Record<string, string>; url?: string }[] {
+  const headers: string[] = []
+  tableEl.find('thead tr th, thead tr td').each((_, th) => { headers.push($(th).text().trim()) })
+  if (headers.length === 0) {
+    tableEl.find('tr').first().find('th, td').each((_, th) => { headers.push($(th).text().trim()) })
+  }
+  const results: { row: Record<string, string>; url?: string }[] = []
+  tableEl.find('tbody tr, tr').each((rowIdx, tr) => {
+    const cells: string[] = []
+    $(tr).find('td, th').each((_, td) => { cells.push($(td).text().trim()) })
+    if (cells.length === 0) return
+    if (rowIdx === 0 && headers.length > 0 && cells[0] === headers[0]) return
+    const row: Record<string, string> = {}
+    headers.forEach((h, i) => { row[h] = cells[i] ?? '' })
+    cells.forEach((c, i) => { if (!row[i.toString()]) row[i.toString()] = c })
+    const url = $(tr).find('a[href]').first().attr('href') || undefined
+    results.push({ row, url })
+  })
+  return results
 }
 
 // ---------------------------------------------------------------------------
@@ -188,10 +220,10 @@ function parseSection1($: CheerioAPI): Section1 | undefined {
 
     // Primary: bullet list format — "1423047 (thuleBundle) - Název - 15 | skupina - Admin"
     const bulletLines = findBulletLines($, content)
-    for (const line of bulletLines) {
-      const m = /^(\d+)\s*\(([^)]+)\)\s*-\s*(.+?)\s*-\s*(\d+)\s*\|\s*(.+?)\s*-\s*(.+)$/.exec(line.trim())
+    for (const { text, url } of bulletLines) {
+      const m = /^(\d+)\s*\(([^)]+)\)\s*-\s*(.+?)\s*-\s*(\d+)\s*\|\s*(.+?)\s*-\s*(.+)$/.exec(text.trim())
       if (m) {
-        sample.push({ id: m[1], typ: m[2].trim(), nazev: m[3].trim(), skupina_id: m[4], skupina_nazev: m[5].trim(), admin: m[6].trim() })
+        sample.push({ id: m[1], typ: m[2].trim(), nazev: m[3].trim(), skupina_id: m[4], skupina_nazev: m[5].trim(), admin: m[6].trim(), url })
       }
     }
 
@@ -199,7 +231,7 @@ function parseSection1($: CheerioAPI): Section1 | undefined {
     if (sample.length === 0) {
       const table = findTable($, content)
       if (table) {
-        parseTable($, table).forEach((r) => {
+        parseTableWithUrls($, table).forEach(({ row: r, url }) => {
           sample.push({
             id: r['ID'] || r['Kód'] || r['0'] || '',
             typ: r['Typ'] || r['1'] || '',
@@ -207,6 +239,7 @@ function parseSection1($: CheerioAPI): Section1 | undefined {
             skupina_id: r['Skupina ID'] || r['3'] || '',
             skupina_nazev: r['Skupina'] || r['4'] || '',
             admin: r['Odpovědná osoba'] || r['Admin'] || r['5'] || '',
+            url,
           })
         })
       }
@@ -237,8 +270,8 @@ function parseSection2($: CheerioAPI): Section2 | undefined {
     const sample: Section2['sample'] = []
     const tables = findTables($, content)
 
-    const addRows = (rows: Record<string, string>[], dodavatelOverride?: string) => {
-      for (const r of rows) {
+    const addRows = (entries: { row: Record<string, string>; url?: string }[], dodavatelOverride?: string) => {
+      for (const { row: r, url } of entries) {
         const kod = r['Kód'] || r['kod'] || r['1'] || r['0'] || ''
         if (!kod || /celkem/i.test(kod)) continue  // skip subtotal rows
         sample.push({
@@ -248,20 +281,21 @@ function parseSection2($: CheerioAPI): Section2 | undefined {
           skupina: r['Skupina'] || r['3'] || '',
           admin: r['Admin'] || r['4'] || '',
           skladem: parseNum(r['Skladem u dodavatele'] || r['Skladem'] || r['5'] || '0'),
+          url,
         })
       }
     }
 
     if (tables.length === 0) {
       const table = findTable($, content)
-      if (table) addRows(parseTable($, table))
+      if (table) addRows(parseTableWithUrls($, table))
     } else if (tables.length === 1) {
-      addRows(parseTable($, tables[0]))
+      addRows(parseTableWithUrls($, tables[0]))
     } else {
       // Multiple tables — each headed by a supplier name
       for (const t of tables) {
         const prevText = t.prev('h3, h4, b, strong, p').text().trim()
-        addRows(parseTable($, t), prevText || undefined)
+        addRows(parseTableWithUrls($, t), prevText || undefined)
       }
     }
 
@@ -290,10 +324,10 @@ function parseSection3($: CheerioAPI): Section3 | undefined {
 
     // Primary: bullet format — "1356003 - Název - ceník: MOC PL - 14 | skupina - Admin"
     const bulletLines = findBulletLines($, content)
-    for (const line of bulletLines) {
-      const m = /^(\d+)\s*-\s*(.+?)\s*-\s*ceník:\s*(.+?)\s*-\s*(\d+)\s*\|\s*(.+?)\s*-\s*(.+)$/.exec(line.trim())
+    for (const { text, url } of bulletLines) {
+      const m = /^(\d+)\s*-\s*(.+?)\s*-\s*ceník:\s*(.+?)\s*-\s*(\d+)\s*\|\s*(.+?)\s*-\s*(.+)$/.exec(text.trim())
       if (m) {
-        allRows.push({ id: m[1], nazev: m[2].trim(), cenik: m[3].trim(), skupina_id: m[4], skupina_nazev: m[5].trim(), admin: m[6].trim() })
+        allRows.push({ id: m[1], nazev: m[2].trim(), cenik: m[3].trim(), skupina_id: m[4], skupina_nazev: m[5].trim(), admin: m[6].trim(), url })
       }
     }
 
@@ -301,7 +335,7 @@ function parseSection3($: CheerioAPI): Section3 | undefined {
     if (allRows.length === 0) {
       const table = findTable($, content)
       if (table) {
-        parseTable($, table).forEach((r) => {
+        parseTableWithUrls($, table).forEach(({ row: r, url }) => {
           allRows.push({
             id: r['ID'] || r['Kód'] || r['0'] || '',
             nazev: r['Název'] || r['1'] || '',
@@ -309,6 +343,7 @@ function parseSection3($: CheerioAPI): Section3 | undefined {
             skupina_id: '',
             skupina_nazev: r['Skupina'] || r['3'] || '',
             admin: r['Admin'] || r['4'] || '',
+            url,
           })
         })
       }
