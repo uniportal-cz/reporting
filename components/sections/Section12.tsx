@@ -2,6 +2,7 @@
 
 import { Section12 as Section12Type } from '@/types/report'
 import { useTableFilter } from '@/hooks/useTableFilter'
+import StatBars from './StatBars'
 
 interface Props {
   data: Section12Type
@@ -9,7 +10,7 @@ interface Props {
 }
 
 export default function Section12({ data, date }: Props) {
-  const { filtered, query, setQuery } = useTableFilter(data.skupiny, ['nazev'])
+  const { filtered, query, setQuery } = useTableFilter(data.skupiny, ['nazev', 'admin'])
 
   return (
     <div>
@@ -18,11 +19,25 @@ export default function Section12({ data, date }: Props) {
           <p className="text-xs text-gray-500">Celkem produktů</p>
           <p className="text-2xl font-bold text-gray-900">{data.celkem_produktu}</p>
         </div>
-        <div className="rounded-lg border border-gray-200 p-3">
-          <p className="text-xs text-gray-500">Termínů OZ</p>
-          <p className="text-2xl font-bold text-gray-900">{data.pocet_terminu_oz}</p>
-        </div>
+        {data.celkem_v_terminech > 0 && (
+          <div className="rounded-lg border border-gray-200 p-3">
+            <p className="text-xs text-gray-500">Produktů v termínech</p>
+            <p className="text-2xl font-bold text-orange-600">{data.celkem_v_terminech}</p>
+          </div>
+        )}
+        {data.pocet_terminu_oz > 0 && (
+          <div className="rounded-lg border border-gray-200 p-3">
+            <p className="text-xs text-gray-500">Termínů OZ</p>
+            <p className="text-2xl font-bold text-gray-900">{data.pocet_terminu_oz}</p>
+          </div>
+        )}
       </div>
+
+      {Object.keys(data.byAdmin).length > 0 && (
+        <div className="mb-6">
+          <StatBars data={data.byAdmin} title="Produkty dle admina" />
+        </div>
+      )}
 
       <div className="mb-3 flex items-center gap-3">
         <input
@@ -45,6 +60,7 @@ export default function Section12({ data, date }: Props) {
           <thead>
             <tr className="bg-gray-50 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
               <th className="px-3 py-2">Skupina</th>
+              {data.skupiny.some((s) => s.admin) && <th className="px-3 py-2">Admin</th>}
               <th className="px-3 py-2 text-right">Počet</th>
             </tr>
           </thead>
@@ -52,6 +68,9 @@ export default function Section12({ data, date }: Props) {
             {filtered.map((item, i) => (
               <tr key={i} className="hover:bg-gray-50">
                 <td className="px-3 py-2 font-medium">{item.nazev}</td>
+                {data.skupiny.some((s) => s.admin) && (
+                  <td className="px-3 py-2 text-gray-600">{item.admin ?? '—'}</td>
+                )}
                 <td className="px-3 py-2 text-right font-semibold">{item.pocet}</td>
               </tr>
             ))}

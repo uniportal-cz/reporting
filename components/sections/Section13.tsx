@@ -2,6 +2,7 @@
 
 import { Section13 as Section13Type } from '@/types/report'
 import { useTableFilter } from '@/hooks/useTableFilter'
+import StatBars from './StatBars'
 
 interface Props {
   data: Section13Type
@@ -13,6 +14,17 @@ export default function Section13({ data, date }: Props) {
 
   return (
     <div>
+      {(Object.keys(data.stats?.bySkupina ?? {}).length > 0 || Object.keys(data.stats?.byAdmin ?? {}).length > 0) && (
+        <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
+          {Object.keys(data.stats.bySkupina).length > 0 && (
+            <StatBars data={data.stats.bySkupina} title="Skupiny" />
+          )}
+          {Object.keys(data.stats.byAdmin).length > 0 && (
+            <StatBars data={data.stats.byAdmin} title="Admin" />
+          )}
+        </div>
+      )}
+
       <div className="mb-3 flex items-center gap-3">
         <input
           type="text"

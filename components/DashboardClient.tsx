@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, lazy, Suspense } from 'react'
+import { useState, lazy, Suspense, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { Report, ReportIndex } from '@/types/report'
+import { Report, ReportIndex, ReportKPI } from '@/types/report'
 import { REPORT_TYPES } from '@/lib/report-types'
 import type { StorageStatus } from '@/app/dashboard/page'
 import { format, parseISO, isValid } from 'date-fns'
@@ -13,25 +13,70 @@ const Section1 = lazy(() => import('./sections/Section1'))
 const Section2 = lazy(() => import('./sections/Section2'))
 const Section3 = lazy(() => import('./sections/Section3'))
 const Section4 = lazy(() => import('./sections/Section4'))
+const Section5 = lazy(() => import('./sections/Section5'))
+const Section6 = lazy(() => import('./sections/Section6'))
 const Section7 = lazy(() => import('./sections/Section7'))
+const Section8 = lazy(() => import('./sections/Section8'))
 const Section9 = lazy(() => import('./sections/Section9'))
+const Section10 = lazy(() => import('./sections/Section10'))
 const Section11 = lazy(() => import('./sections/Section11'))
 const Section12 = lazy(() => import('./sections/Section12'))
 const Section13 = lazy(() => import('./sections/Section13'))
 const Section14 = lazy(() => import('./sections/Section14'))
 const Section15 = lazy(() => import('./sections/Section15'))
 
-// ─── KPI Card ────────────────────────────────────────────────────────────────
+// ─── KPI Chip Bar ────────────────────────────────────────────────────────────
 
-interface KpiCardProps { label: string; value: number; color: 'red' | 'orange' | 'blue' | 'purple' }
+interface KpiChip {
+  id: string
+  label: string
+  value: number | undefined
+  prev: number | undefined
+  color: 'red' | 'orange' | 'blue' | 'purple' | 'gray'
+}
 
-function KpiCard({ label, value, color }: KpiCardProps) {
-  const bg = { red: 'bg-red-50 border-red-200', orange: 'bg-orange-50 border-orange-200', blue: 'bg-blue-50 border-blue-200', purple: 'bg-purple-50 border-purple-200' }[color]
-  const num = { red: 'text-red-700', orange: 'text-orange-700', blue: 'text-blue-700', purple: 'text-purple-700' }[color]
+function getDelta(curr: number | undefined, prev: number | undefined): number | null {
+  if (curr === undefined || prev === undefined) return null
+  return curr - prev
+}
+
+function KpiChipBar({ chips }: { chips: KpiChip[] }) {
   return (
-    <div className={`rounded-xl border p-4 ${bg}`}>
-      <p className="text-xs font-medium uppercase tracking-wider text-gray-500">{label}</p>
-      <p className={`mt-1 text-3xl font-bold ${num}`}>{value}</p>
+    <div className="flex gap-2 overflow-x-auto py-2 scrollbar-thin">
+      {chips.map((chip) => {
+        const v = chip.value
+        const delta = getDelta(chip.value, chip.prev)
+        const colorCls = {
+          red: 'border-red-200 bg-red-50',
+          orange: 'border-orange-200 bg-orange-50',
+          blue: 'border-blue-200 bg-blue-50',
+          purple: 'border-purple-200 bg-purple-50',
+          gray: 'border-gray-200 bg-gray-50',
+        }[chip.color]
+        const numCls = {
+          red: 'text-red-700',
+          orange: 'text-orange-700',
+          blue: 'text-blue-700',
+          purple: 'text-purple-700',
+          gray: 'text-gray-700',
+        }[chip.color]
+
+        return (
+          <div key={chip.id} className={`flex-shrink-0 rounded-xl border px-3 py-2 min-w-[90px] ${colorCls}`}>
+            <p className="text-xs text-gray-500 leading-tight whitespace-nowrap">{chip.label}</p>
+            <div className="flex items-baseline gap-1.5 mt-0.5">
+              <span className={`text-xl font-bold ${v === undefined ? 'text-gray-300' : numCls}`}>
+                {v ?? '—'}
+              </span>
+              {delta !== null && delta !== 0 && (
+                <span className={`text-xs font-semibold ${delta > 0 ? 'text-red-500' : 'text-green-600'}`}>
+                  {delta > 0 ? `+${delta}` : delta}
+                </span>
+              )}
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -127,6 +172,32 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
 
   const s = report.sections
   const kpi = report.kpi
+
+  // Find previous report KPI for deltas
+  const prevKpi = useMemo<ReportKPI | undefined>(() => {
+    const sorted = [...index.reports]
+      .filter((r) => r.reportType === activeType && r.date < report.date)
+      .sort((a, b) => b.date.localeCompare(a.date))
+    return sorted[0]?.kpi
+  }, [index.reports, activeType, report.date])
+
+  const kpiChips: KpiChip[] = [
+    { id: 'sec1', label: '1 Doprodej', value: kpi.sec1_count, prev: prevKpi?.sec1_count, color: 'orange' },
+    { id: 'sec2', label: '2 Bez skladu', value: kpi.sec2_count, prev: prevKpi?.sec2_count, color: 'blue' },
+    { id: 'sec3', label: '3 Rozdílná cena', value: kpi.sec3_count, prev: prevKpi?.sec3_count, color: 'blue' },
+    { id: 'sec4', label: '4 Nelze doručit', value: kpi.sec4_count, prev: prevKpi?.sec4_count, color: 'red' },
+    { id: 'sec5', label: '5 TARIC', value: kpi.sec5_count, prev: prevKpi?.sec5_count, color: 'orange' },
+    { id: 'sec6', label: '6 Bez TARIC', value: kpi.sec6_count, prev: prevKpi?.sec6_count, color: 'orange' },
+    { id: 'sec7', label: '7 Dárek', value: kpi.sec7_count, prev: prevKpi?.sec7_count, color: 'orange' },
+    { id: 'sec8', label: '8 Kat. strom', value: kpi.sec8_count, prev: prevKpi?.sec8_count, color: 'gray' },
+    { id: 'sec9', label: '9 Likvidace', value: kpi.sec9_terms, prev: prevKpi?.sec9_terms, color: 'purple' },
+    { id: 'sec10', label: '10 AutoOb.', value: kpi.sec10_count, prev: prevKpi?.sec10_count, color: 'purple' },
+    { id: 'sec11', label: '11 Mimo sale.', value: kpi.sec11_count, prev: prevKpi?.sec11_count, color: 'gray' },
+    { id: 'sec12', label: '12 Rozměry', value: kpi.sec12_count, prev: prevKpi?.sec12_count, color: 'gray' },
+    { id: 'sec13', label: '13 Bez kat.', value: kpi.sec13_count, prev: prevKpi?.sec13_count, color: 'blue' },
+    { id: 'sec14', label: '14 Záp. marže', value: kpi.sec14_count, prev: prevKpi?.sec14_count, color: 'red' },
+    { id: 'sec15', label: '15 Nesoulad', value: kpi.sec15_count, prev: prevKpi?.sec15_count, color: 'gray' },
+  ]
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
@@ -266,14 +337,8 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
           </div>
 
           <div className="px-6 py-5 space-y-4">
-            {/* KPI Cards */}
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-              <KpiCard label="Doprodej bez zásoby" value={kpi.sec1_count} color="orange" />
-              <KpiCard label="Nelze doručit" value={kpi.sec4_count} color="red" />
-              <KpiCard label="Záporná marže" value={kpi.sec14_count} color="red" />
-              <KpiCard label="Bez kategorie" value={kpi.sec13_count} color="blue" />
-              <KpiCard label="Likvidace – termínů" value={kpi.sec9_terms} color="purple" />
-            </div>
+            {/* KPI Chip Bar */}
+            <KpiChipBar chips={kpiChips} />
 
             {/* Sections — always rendered, green when empty */}
             <div className="space-y-2">
@@ -314,12 +379,39 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
               </CollapsibleSection>
 
               <CollapsibleSection
+                title="5. Produkty s TARIC kódem — nelze odeslat"
+                description="Produkty mají vyplněný TARIC kód, ale z technických důvodů je nelze odeslat do zahraničí."
+                badge={s.sec5?.total ?? 0}
+                badgeColor="orange"
+              >
+                {s.sec5 && <Section5 data={s.sec5} date={report.date} />}
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="6. Produkty s nevyplněným TARIC kódem"
+                description="Prodejné produkty bez TARIC kódu — kód je povinný pro vývoz mimo EU a pro správné celní zařazení."
+                badge={s.sec6?.total ?? 0}
+                badgeColor="orange"
+              >
+                {s.sec6 && <Section6 data={s.sec6} date={report.date} />}
+              </CollapsibleSection>
+
+              <CollapsibleSection
                 title="7. Dárek není skladem"
                 description="Produkt nastavený jako dárek k objednávce není momentálně skladem — zákazník dárek nedostane."
-                badge={s.sec7?.items.length ?? 0}
+                badge={s.sec7?.total ?? 0}
                 badgeColor="orange"
               >
                 {s.sec7 && <Section7 data={s.sec7} date={report.date} />}
+              </CollapsibleSection>
+
+              <CollapsibleSection
+                title="8. Nesoulad kategorizace — strom"
+                description="Stromová struktura kategorií se špatně přiřazenými produkty — produkty nesplňují pravidla kategorizace."
+                badge={s.sec8?.celkem_mimo ?? 0}
+                badgeColor="gray"
+              >
+                {s.sec8 && <Section8 data={s.sec8} date={report.date} />}
               </CollapsibleSection>
 
               <CollapsibleSection
@@ -332,9 +424,18 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
               </CollapsibleSection>
 
               <CollapsibleSection
+                title="10. Produkty v limitu autoobjednání"
+                description="Produkty, které dosahují nebo přesahují nastavený limit pro automatické objednání — vyžadují kontrolu."
+                badge={s.sec10?.items.length ?? 0}
+                badgeColor="purple"
+              >
+                {s.sec10 && <Section10 data={s.sec10} date={report.date} reportDate={report.date} />}
+              </CollapsibleSection>
+
+              <CollapsibleSection
                 title="11. Mimo saleable"
                 description="Produkty, které jsou v systému aktivní, ale nesplňují podmínky pro zařazení do prodejního katalogu (saleable)."
-                badge={s.sec11?.celkem ?? 0}
+                badge={s.sec11?.celkem_produktu ?? s.sec11?.celkem ?? 0}
                 badgeColor="gray"
               >
                 {s.sec11 && <Section11 data={s.sec11} date={report.date} />}
@@ -352,7 +453,7 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
               <CollapsibleSection
                 title="13. Saleable bez kategorie"
                 description="Prodejné produkty bez přiřazené kategorie — zákazník je nenajde v navigaci ani filtrech, jsou prakticky neviditelné."
-                badge={s.sec13?.items.length ?? 0}
+                badge={s.sec13?.total ?? s.sec13?.items.length ?? 0}
                 badgeColor="blue"
               >
                 {s.sec13 && <Section13 data={s.sec13} date={report.date} />}
@@ -370,7 +471,7 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
               <CollapsibleSection
                 title="15. Nesoulad kategorizace"
                 description="Produkty zařazené do kategorií, které neodpovídají jejich skutečným atributům — vede k chybným filtrům a špatné zkušenosti zákazníka."
-                badge={s.sec15 ? s.sec15.kategorie.reduce((n, k) => n + k.produktu_mimo, 0) : 0}
+                badge={s.sec15?.celkem_mimo ?? s.sec15?.kategorie.reduce((n, k) => n + k.produktu_mimo, 0) ?? 0}
                 badgeColor="gray"
               >
                 {s.sec15 && <Section15 data={s.sec15} date={report.date} />}

@@ -9,6 +9,30 @@ function sectionToCsv(report: Report, section: string): string {
   const s = report.sections
 
   switch (section) {
+    case '5': {
+      const items = s.sec5?.items ?? []
+      return Papa.unparse(items.map((i) => ({ Kód: i.kod, Typ: i.typ, Název: i.nazev, Skupina: i.skupina, Admin: i.admin })))
+    }
+    case '6': {
+      const items = s.sec6?.items ?? []
+      return Papa.unparse(items.map((i) => ({ 'UN kód': i.un_kod, Počet: i.pocet })))
+    }
+    case '8': {
+      const rows: Record<string, string | number>[] = []
+      for (const strom of s.sec8?.stromy ?? []) {
+        for (const kat of strom.kategorie) {
+          rows.push({ Strom: strom.nazev, Kategorie: kat.nazev, Pravidel: kat.pocet_pravidel, 'Produktů mimo': kat.produktu_mimo })
+        }
+      }
+      return Papa.unparse(rows)
+    }
+    case '10': {
+      const items = s.sec10?.items ?? []
+      return Papa.unparse(items.map((i) => ({
+        Dodavatel: i.dodavatel, Kód: i.kod, Název: i.nazev, Skupina: i.skupina, Admin: i.admin,
+        Ks: i.ks, 'OZ číslo': i.oz_cislo, Termín: i.termin, Level: i.level,
+      })))
+    }
     case '1': {
       const items = s.sec1?.sample ?? []
       return Papa.unparse(

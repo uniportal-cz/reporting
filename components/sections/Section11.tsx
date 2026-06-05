@@ -11,6 +11,7 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 import { useTableFilter } from '@/hooks/useTableFilter'
+import StatBars from './StatBars'
 
 interface Props {
   data: Section11Type
@@ -31,6 +32,23 @@ export default function Section11({ data, date }: Props) {
 
   return (
     <div>
+      <div className="mb-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+        <div className="rounded-lg border border-gray-200 p-3">
+          <p className="text-xs text-gray-500">Skupin</p>
+          <p className="text-2xl font-bold text-gray-900">{data.celkem}</p>
+        </div>
+        <div className="rounded-lg border border-gray-200 p-3">
+          <p className="text-xs text-gray-500">Celkem produktů</p>
+          <p className="text-2xl font-bold text-gray-900">{data.celkem_produktu}</p>
+        </div>
+      </div>
+
+      {Object.keys(data.byAdmin).length > 0 && (
+        <div className="mb-6">
+          <StatBars data={data.byAdmin} title="Produktů mimo saleable dle admina" />
+        </div>
+      )}
+
       {chartData.length > 0 && (
         <div className="mb-6">
           <ResponsiveContainer width="100%" height={260}>
@@ -90,8 +108,8 @@ export default function Section11({ data, date }: Props) {
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-gray-200 bg-gray-50">
-              <td colSpan={3} className="px-3 py-2 font-semibold">Celkem</td>
-              <td className="px-3 py-2 text-right font-bold">{data.celkem}</td>
+              <td colSpan={3} className="px-3 py-2 font-semibold">Skupin celkem / produktů celkem</td>
+              <td className="px-3 py-2 text-right font-bold">{data.celkem} / {data.celkem_produktu}</td>
             </tr>
           </tfoot>
         </table>

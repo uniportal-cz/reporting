@@ -10,13 +10,20 @@ import {
   Section3,
   Section4,
   Section4Product,
+  Section5,
+  Section6,
   Section7,
+  Section8,
+  Section8Strom,
   Section9,
+  Section10,
   Section11,
   Section12,
   Section13,
   Section14,
   Section15,
+  Section15Kategorie,
+  Section15Strom,
   MarzeProduct,
 } from '@/types/report'
 
@@ -86,7 +93,6 @@ function parseTable($: CheerioAPI, tableEl: Cheerio<AnyNode>): Record<string, st
     headers.push($(th).text().trim())
   })
   if (headers.length === 0) {
-    // try first tr as header
     tableEl.find('tr').first().find('th, td').each((_, th) => {
       headers.push($(th).text().trim())
     })
@@ -99,13 +105,11 @@ function parseTable($: CheerioAPI, tableEl: Cheerio<AnyNode>): Record<string, st
       cells.push($(td).text().trim())
     })
     if (cells.length === 0) return
-    // skip header row
     if (rowIdx === 0 && headers.length > 0 && cells[0] === headers[0]) return
     const row: Record<string, string> = {}
     headers.forEach((h, i) => {
       row[h] = cells[i] ?? ''
     })
-    // also store by index for headerless fallback
     cells.forEach((c, i) => {
       if (!row[i.toString()]) row[i.toString()] = c
     })
@@ -212,14 +216,12 @@ function parseSection1($: CheerioAPI): Section1 | undefined {
     const content = collectSectionContent($, heading)
     const allText = content.map((el) => el.text()).join('\n')
 
-    // Total from "celkem produktů: (N)" in content, or from heading
     let total = extractCount(heading.text())
     const celkemMatch = /celkem\s+produkt[ůu][:\s]+\(?(\d+)\)?/i.exec(allText)
     if (celkemMatch) total = parseInt(celkemMatch[1], 10)
 
     const sample: Section1['sample'] = []
 
-    // Primary: bullet list format — "1423047 (thuleBundle) - Název - 15 | skupina - Admin"
     const bulletLines = findBulletLines($, content)
     for (const { text, url } of bulletLines) {
       const m = /^(\d+)\s*\(([^)]+)\)\s*-\s*(.+?)\s*-\s*(\d+)\s*\|\s*(.+?)\s*-\s*(.+)$/.exec(text.trim())
@@ -228,7 +230,6 @@ function parseSection1($: CheerioAPI): Section1 | undefined {
       }
     }
 
-    // Fallback: table
     if (sample.length === 0) {
       const table = findTable($, content)
       if (table) {
@@ -275,9 +276,7 @@ function parseSection2($: CheerioAPI): Section2 | undefined {
     const addRows = (entries: { row: Record<string, string>; url?: string }[], dodavatelOverride?: string) => {
       for (const { row: r, url } of entries) {
         const kod = r['Kód'] || r['kod'] || r['1'] || ''
-        // Skip repeated header rows (kod is literally "Kód") and subtotal rows ("celkem")
         if (!kod || /^kód?$/i.test(kod) || /celkem/i.test(kod)) continue
-        // Skip subtotal rows where the dodavatel cell contains "celkem N záznamů"
         const dodavatel = dodavatelOverride || r['Dodavatel'] || r['dodavatel'] || r['0'] || ''
         if (/celkem\s+\d+/i.test(dodavatel)) continue
 
@@ -307,7 +306,6 @@ function parseSection2($: CheerioAPI): Section2 | undefined {
       }
     }
 
-    // Text-based fallback when the table approach yields nothing
     if (sample.length === 0) {
       const lines = content
         .map((el) => el.text())
@@ -321,7 +319,6 @@ function parseSection2($: CheerioAPI): Section2 | undefined {
         if (/celkem\s+\d+\s+záznam/i.test(line)) continue
         if (/^vygenerováno/i.test(line)) continue
 
-        // Anchor on group pattern "NN | name" then extract code and company before it
         const gm = /\s(\d{1,3}\s*\|\s*\S[^\n]*?)\s{2,}(\S+(?:\s+\S+)?)\s*(-?[\d]+\.?[\d]*)?\s*$/.exec(line)
         if (!gm) continue
 
@@ -330,7 +327,6 @@ function parseSection2($: CheerioAPI): Section2 | undefined {
         const admin = gm[2].trim()
         const skladem = gm[3] ? parseNum(gm[3]) : 0
 
-        // Code is the first numeric token after the company name
         const cm = /\s+([\d][\d.-]*)\s+(.+)$/.exec(before)
         if (!cm) continue
 
@@ -372,7 +368,6 @@ function parseSection3($: CheerioAPI): Section3 | undefined {
     const content = collectSectionContent($, heading)
     const allRows: Section3['sample'] = []
 
-    // Primary: bullet format — "1356003 - Název - ceník: MOC PL - 14 | skupina - Admin"
     const bulletLines = findBulletLines($, content)
     for (const { text, url } of bulletLines) {
       const m = /^(\d+)\s*-\s*(.+?)\s*-\s*ceník:\s*(.+?)\s*-\s*(\d+)\s*\|\s*(.+?)\s*-\s*(.+)$/.exec(text.trim())
@@ -381,7 +376,6 @@ function parseSection3($: CheerioAPI): Section3 | undefined {
       }
     }
 
-    // Fallback: table
     if (allRows.length === 0) {
       const table = findTable($, content)
       if (table) {
@@ -400,8 +394,6 @@ function parseSection3($: CheerioAPI): Section3 | undefined {
     }
 
     const totalRows = allRows.length
-
-    // Dedup by ID — keep first occurrence
     const seen = new Set<string>()
     const sample = allRows.filter((row) => { if (seen.has(row.id)) return false; seen.add(row.id); return true })
     const uniqueCount = sample.length
@@ -519,6 +511,102 @@ function parseSection4($: CheerioAPI): Section4 | undefined {
   }
 }
 
+function parseSection5($: CheerioAPI): Section5 | undefined {
+  try {
+    const heading = findHeading($, [
+      /5[\.\)].*(taric|nemožnost)/i,
+      'taric',
+      'nemožnost odeslání',
+    ])
+    if (!heading) return undefined
+
+    const content = collectSectionContent($, heading)
+    const allText = content.map((el) => el.text()).join('\n')
+
+    let total = extractCount(heading.text())
+    const celkemMatch = /celkem[:\s]+\(?(\d+)\)?/i.exec(allText)
+    if (celkemMatch) total = parseInt(celkemMatch[1], 10)
+
+    const items: Section5['items'] = []
+
+    const bulletLines = findBulletLines($, content)
+    for (const { text, url } of bulletLines) {
+      // "1234567 (typ) - Název - 15 | skupina - Admin"
+      const m = /^(\d+)\s*\(([^)]+)\)\s*-\s*(.+?)\s*-\s*(\d+)\s*\|\s*(.+?)\s*-\s*(.+)$/.exec(text.trim())
+      if (m) {
+        items.push({ kod: m[1], typ: m[2].trim(), nazev: m[3].trim(), skupina: `${m[4]} | ${m[5].trim()}`, admin: m[6].trim(), url })
+      }
+    }
+
+    if (items.length === 0) {
+      const table = findTable($, content)
+      if (table) {
+        parseTableWithUrls($, table).forEach(({ row: r, url }) => {
+          items.push({
+            kod: r['Kód'] || r['ID'] || r['0'] || '',
+            typ: r['Typ'] || r['1'] || '',
+            nazev: r['Název'] || r['2'] || '',
+            skupina: r['Skupina'] || r['3'] || '',
+            admin: r['Admin'] || r['4'] || '',
+            url,
+          })
+        })
+      }
+    }
+
+    const bySkupina: Record<string, number> = {}
+    const byAdmin: Record<string, number> = {}
+    for (const item of items) {
+      const s = item.skupina || 'Neznámá'; bySkupina[s] = (bySkupina[s] || 0) + 1
+      const a = item.admin || 'Neznámý'; byAdmin[a] = (byAdmin[a] || 0) + 1
+    }
+
+    return { total: total || items.length, items, stats: { bySkupina, byAdmin } }
+  } catch (e) { console.error('parseSection5 error:', e); return undefined }
+}
+
+function parseSection6($: CheerioAPI): Section6 | undefined {
+  try {
+    const heading = findHeading($, [
+      /6[\.\)].*(taric|nevyplněn)/i,
+      'nevyplněný taric',
+      'taric kód',
+    ])
+    if (!heading) return undefined
+
+    const content = collectSectionContent($, heading)
+    const allText = content.map((el) => el.text()).join('\n')
+
+    let total = extractCount(heading.text())
+    const celkemMatch = /celkem[:\s]+\(?(\d+)\)?/i.exec(allText)
+    if (celkemMatch) total = parseInt(celkemMatch[1], 10)
+
+    const items: Section6['items'] = []
+
+    const table = findTable($, content)
+    if (table) {
+      parseTable($, table).forEach((r) => {
+        const un_kod = r['UN kód'] || r['UN'] || r['Kód'] || r['0'] || ''
+        const pocet = parseNum(r['Počet'] || r['Produktů'] || r['1'] || '0')
+        if (un_kod) items.push({ un_kod, pocet })
+      })
+    }
+
+    if (items.length === 0) {
+      // bullet / list fallback: "UN_KOD: N produktů"
+      const bulletLines = findBulletLines($, content)
+      for (const { text } of bulletLines) {
+        const m = /^(.+?)[:\s]+(\d+)/.exec(text.trim())
+        if (m) items.push({ un_kod: m[1].trim(), pocet: parseInt(m[2], 10) })
+      }
+    }
+
+    const derivedTotal = items.reduce((s, i) => s + i.pocet, 0)
+
+    return { total: total || derivedTotal, items }
+  } catch (e) { console.error('parseSection6 error:', e); return undefined }
+}
+
 function parseSection7($: CheerioAPI): Section7 | undefined {
   try {
     const heading = findHeading($, [
@@ -529,7 +617,7 @@ function parseSection7($: CheerioAPI): Section7 | undefined {
 
     const content = collectSectionContent($, heading)
     const table = findTable($, content)
-    if (!table) return { items: [] }
+    if (!table) return { total: 0, items: [] }
 
     const rows = parseTable($, table)
     const items = rows.map((r) => ({
@@ -541,11 +629,95 @@ function parseSection7($: CheerioAPI): Section7 | undefined {
       skladem: parseNum(r['Skladem'] || r['5'] || '0'),
     }))
 
-    return { items }
+    return { total: items.length, items }
   } catch (e) {
     console.error('parseSection7 error:', e)
     return undefined
   }
+}
+
+function parseSection8($: CheerioAPI): Section8 | undefined {
+  try {
+    const heading = findHeading($, [
+      /8[\.\)]\s*(kategori)/i,
+      /8[\.\)].*(nesoulad)/i,
+      'kategorie — strom',
+      'nesoulad kategorizace',
+    ])
+    if (!heading) return undefined
+
+    const content = collectSectionContent($, heading)
+    const allText = content.map((el) => el.text()).join('\n')
+
+    let celkem_mimo = 0
+    const mimoMatch = /celkem\s+mimo[:\s]+(\d+)/i.exec(allText)
+    if (mimoMatch) celkem_mimo = parseInt(mimoMatch[1], 10)
+
+    const stromy: Section8Strom[] = []
+    let currentStrom: Section8Strom | null = null
+
+    // Parse tree: h3/h4 or bold text = tree node, li = category entry
+    for (const el of content) {
+      const tag = (el[0] as Element)?.tagName?.toLowerCase()
+      const text = el.text().trim()
+
+      // Tree node heading: bold or h3/h4
+      if (tag && /^h[3-5]$/.test(tag)) {
+        currentStrom = { nazev: text, kategorie: [] }
+        stromy.push(currentStrom)
+        continue
+      }
+
+      if (tag === 'ul' || tag === 'ol') {
+        el.find('li').each((_, li) => {
+          const t = $(li).text().trim()
+          if (!t) return
+          // Check if this is a tree node marker "N - Název"
+          const nodeM = /^(\d+)\s*[-–]\s*(.+)$/.exec(t)
+          if (nodeM && !t.includes('pravidel') && !t.includes('produktů')) {
+            currentStrom = { nazev: nodeM[2].trim(), kategorie: [] }
+            stromy.push(currentStrom)
+            return
+          }
+          // Category entry: "Název N pravidel | M produktů mimo kategorii"
+          const catM = /^(.+?)\s+(\d+)\s+pravidel\s*[|\/,]\s*(\d+)\s+produkt/i.exec(t)
+          if (catM && currentStrom) {
+            currentStrom.kategorie.push({
+              nazev: catM[1].trim(),
+              pocet_pravidel: parseInt(catM[2], 10),
+              produktu_mimo: parseInt(catM[3], 10),
+            })
+          }
+        })
+        continue
+      }
+
+      // Table fallback — single table with all kategorie
+      if (tag === 'table') {
+        const rows = parseTable($, el)
+        for (const r of rows) {
+          const nazev = r['Kategorie'] || r['Název'] || r['0'] || ''
+          if (!nazev) continue
+          if (!currentStrom) {
+            currentStrom = { nazev: 'Ostatní', kategorie: [] }
+            stromy.push(currentStrom)
+          }
+          currentStrom.kategorie.push({
+            nazev,
+            pocet_pravidel: parseNum(r['Pravidel'] || r['1'] || '0'),
+            produktu_mimo: parseNum(r['Produktů mimo'] || r['2'] || '0'),
+          })
+        }
+      }
+    }
+
+    const celkem_kategorii = stromy.reduce((s, st) => s + st.kategorie.length, 0)
+    if (!celkem_mimo) {
+      celkem_mimo = stromy.reduce((s, st) => s + st.kategorie.reduce((ss, k) => ss + k.produktu_mimo, 0), 0)
+    }
+
+    return { celkem_kategorii, celkem_mimo, stromy }
+  } catch (e) { console.error('parseSection8 error:', e); return undefined }
 }
 
 function parseSection9($: CheerioAPI): Section9 | undefined {
@@ -557,7 +729,6 @@ function parseSection9($: CheerioAPI): Section9 | undefined {
     ])
     if (!heading) return undefined
 
-    const headingText = heading.text()
     const content = collectSectionContent($, heading)
     const table = findTable($, content)
     if (!table) return { celkem: 0, terminy: [], items: [] }
@@ -589,6 +760,46 @@ function parseSection9($: CheerioAPI): Section9 | undefined {
   }
 }
 
+function parseSection10($: CheerioAPI): Section10 | undefined {
+  try {
+    const heading = findHeading($, [
+      /10[\.\)].*(limit|autoobjednání|auto.?objednání)/i,
+      'autoobjednání',
+      'limit objednání',
+    ])
+    if (!heading) return undefined
+
+    const content = collectSectionContent($, heading)
+    const table = findTable($, content)
+    if (!table) return { celkem: 0, terminy: [], items: [] }
+
+    const rows = parseTable($, table)
+    const items = rows.map((r) => ({
+      dodavatel: r['Dodavatel'] || r['0'] || '',
+      kod: r['Kód'] || r['kod'] || r['1'] || '',
+      nazev: r['Název'] || r['2'] || '',
+      skupina: r['Skupina'] || r['3'] || '',
+      admin: r['Admin'] || r['4'] || '',
+      ks: parseNum(r['Ks'] || r['Množství'] || r['5'] || '0'),
+      oz_cislo: r['OZ'] || r['Číslo OZ'] || r['6'] || '',
+      termin: r['Termín'] || r['Datum'] || r['7'] || '',
+      level: r['Level'] || r['Úroveň'] || r['8'] || '',
+    }))
+
+    const terminySet = new Set(items.map((i) => i.termin).filter(Boolean))
+    const terminy = Array.from(terminySet).sort()
+
+    return {
+      celkem: items.reduce((sum, i) => sum + i.ks, 0),
+      terminy,
+      items,
+    }
+  } catch (e) {
+    console.error('parseSection10 error:', e)
+    return undefined
+  }
+}
+
 function parseSection11($: CheerioAPI): Section11 | undefined {
   try {
     const heading = findHeading($, [
@@ -600,19 +811,57 @@ function parseSection11($: CheerioAPI): Section11 | undefined {
     if (!heading) return undefined
 
     const content = collectSectionContent($, heading)
-    const table = findTable($, content)
-    if (!table) return { items: [], celkem: 0 }
+    const allText = content.map((el) => el.text()).join('\n')
 
-    const rows = parseTable($, table)
-    const items = rows.map((r) => ({
-      skupina_id: r['Skupina ID'] || r['skupina_id'] || r['0'] || '',
-      skupina_nazev: r['Skupina'] || r['skupina_nazev'] || r['1'] || '',
-      admin: r['Admin'] || r['2'] || '',
-      pocet: parseNum(r['Počet'] || r['pocet'] || r['3'] || '0'),
-    }))
+    // Parse "Celkový počet produktů: 1803" or "celkem N produktů"
+    let celkem_produktu = 0
+    const produktuMatch = /celkov[ýý]\s+počet\s+produkt[ůu][:\s]+(\d+)/i.exec(allText)
+      || /celkem\s+(\d+)\s+produkt/i.exec(allText)
+    if (produktuMatch) celkem_produktu = parseInt(produktuMatch[1], 10)
+
+    const items: Section11['items'] = []
+
+    // Try bullet list format: "15 | travel - Lukas Drbal - 888"
+    const bulletLines = findBulletLines($, content)
+    for (const { text } of bulletLines) {
+      // skip summary/celkem lines
+      if (/celkem|celkov/i.test(text)) continue
+      const m = /^(\d+)\s*\|\s*(.+?)\s*[-–]\s*(.+?)\s*[-–]\s*(\d+)$/.exec(text.trim())
+      if (m) {
+        items.push({
+          skupina_id: m[1],
+          skupina_nazev: m[2].trim(),
+          admin: m[3].trim(),
+          pocet: parseInt(m[4], 10),
+        })
+      }
+    }
+
+    // Fallback: table
+    if (items.length === 0) {
+      const table = findTable($, content)
+      if (table) {
+        const rows = parseTable($, table)
+        rows.forEach((r) => {
+          items.push({
+            skupina_id: r['Skupina ID'] || r['skupina_id'] || r['0'] || '',
+            skupina_nazev: r['Skupina'] || r['skupina_nazev'] || r['1'] || '',
+            admin: r['Admin'] || r['2'] || '',
+            pocet: parseNum(r['Počet'] || r['pocet'] || r['3'] || '0'),
+          })
+        })
+      }
+    }
 
     const celkem = items.reduce((sum, i) => sum + i.pocet, 0)
-    return { items, celkem }
+
+    const byAdmin: Record<string, number> = {}
+    for (const item of items) {
+      const a = item.admin || 'Neznámý'
+      byAdmin[a] = (byAdmin[a] || 0) + item.pocet
+    }
+
+    return { items, celkem, celkem_produktu: celkem_produktu || celkem, byAdmin }
   } catch (e) {
     console.error('parseSection11 error:', e)
     return undefined
@@ -628,24 +877,63 @@ function parseSection12($: CheerioAPI): Section12 | undefined {
     if (!heading) return undefined
 
     const content = collectSectionContent($, heading)
-    const table = findTable($, content)
-    if (!table) return { celkem_produktu: 0, pocet_terminu_oz: 0, skupiny: [] }
+    const allText = content.map((el) => el.text()).join('\n')
 
-    const rows = parseTable($, table)
-    const skupiny = rows.map((r) => ({
-      nazev: r['Název'] || r['Skupina'] || r['0'] || '',
-      pocet: parseNum(r['Počet'] || r['1'] || '0'),
-    }))
+    // Parse "Produkty v termínech celkem N produktů"
+    let celkem_v_terminech = 0
+    const terminMatch = /v\s+termín[eě]ch\s+celkem\s+(\d+)/i.exec(allText)
+      || /celkem\s+(\d+)\s+produkt[ůu]\s+v\s+termín/i.exec(allText)
+    if (terminMatch) celkem_v_terminech = parseInt(terminMatch[1], 10)
+
+    const skupiny: Section12['skupiny'] = []
+
+    // Bullet list: "Název skupiny (Admin) - N" or "N | skupina - Admin - count"
+    const bulletLines = findBulletLines($, content)
+    for (const { text } of bulletLines) {
+      if (/celkem|celkov|v termín/i.test(text)) continue
+      // "15 | skupina - Admin - 42"
+      const m1 = /^(\d+)\s*\|\s*(.+?)\s*[-–]\s*(.+?)\s*[-–]\s*(\d+)$/.exec(text.trim())
+      if (m1) {
+        skupiny.push({ nazev: `${m1[1]} | ${m1[2].trim()}`, pocet: parseInt(m1[4], 10), admin: m1[3].trim() })
+        continue
+      }
+      // "Název - N"
+      const m2 = /^(.+?)\s*[-–]\s*(\d+)$/.exec(text.trim())
+      if (m2) {
+        skupiny.push({ nazev: m2[1].trim(), pocet: parseInt(m2[2], 10) })
+        continue
+      }
+    }
+
+    // Fallback: table
+    if (skupiny.length === 0) {
+      const table = findTable($, content)
+      if (table) {
+        const rows = parseTable($, table)
+        rows.forEach((r) => {
+          skupiny.push({
+            nazev: r['Název'] || r['Skupina'] || r['0'] || '',
+            pocet: parseNum(r['Počet'] || r['1'] || '0'),
+            admin: r['Admin'] || r['2'] || undefined,
+          })
+        })
+      }
+    }
 
     const celkem_produktu = skupiny.reduce((sum, s) => sum + s.pocet, 0)
 
-    // Try to parse pocet_terminu_oz from a summary row or heading text
     let pocet_terminu_oz = 0
-    const summaryText = content.map((el) => el.text()).join(' ')
-    const termMatch = /termín[ů\s]+OZ[:\s]+(\d+)/i.exec(summaryText)
+    const termMatch = /termín[ů\s]+OZ[:\s]+(\d+)/i.exec(allText)
     if (termMatch) pocet_terminu_oz = parseInt(termMatch[1], 10)
 
-    return { celkem_produktu, pocet_terminu_oz, skupiny }
+    const byAdmin: Record<string, number> = {}
+    for (const sk of skupiny) {
+      if (sk.admin) {
+        byAdmin[sk.admin] = (byAdmin[sk.admin] || 0) + sk.pocet
+      }
+    }
+
+    return { celkem_produktu, celkem_v_terminech, pocet_terminu_oz, skupiny, byAdmin }
   } catch (e) {
     console.error('parseSection12 error:', e)
     return undefined
@@ -663,22 +951,39 @@ function parseSection13($: CheerioAPI): Section13 | undefined {
     if (!heading) return undefined
 
     const content = collectSectionContent($, heading)
+    const allText = content.map((el) => el.text()).join('\n')
+
+    let total = 0
+    const celkemMatch = /celkem\s+(\d+)\s+záznam/i.exec(allText)
+      || /celkem[:\s]+\(?(\d+)\)?/i.exec(allText)
+    if (celkemMatch) total = parseInt(celkemMatch[1], 10)
+
+    const items: Section13['items'] = []
+
     const table = findTable($, content)
-    if (!table) {
-      // try list items
+    if (table) {
+      const rows = parseTable($, table)
+      rows.forEach((r) => {
+        items.push({
+          kod: r['Kód'] || r['kod'] || r['0'] || '',
+          nazev: r['Název'] || r['1'] || '',
+          skupina: r['Skupina'] || r['2'] || '',
+          admin: r['Admin'] || r['3'] || '',
+        })
+      })
+    } else {
       const listItems = findListItems($, content)
-      return { items: listItems.map((li) => ({ kod: '', nazev: li, skupina: '', admin: '' })) }
+      listItems.forEach((li) => items.push({ kod: '', nazev: li, skupina: '', admin: '' }))
     }
 
-    const rows = parseTable($, table)
-    const items = rows.map((r) => ({
-      kod: r['Kód'] || r['kod'] || r['0'] || '',
-      nazev: r['Název'] || r['1'] || '',
-      skupina: r['Skupina'] || r['2'] || '',
-      admin: r['Admin'] || r['3'] || '',
-    }))
+    const bySkupina: Record<string, number> = {}
+    const byAdmin: Record<string, number> = {}
+    for (const item of items) {
+      const s = item.skupina || 'Neznámá'; bySkupina[s] = (bySkupina[s] || 0) + 1
+      const a = item.admin || 'Neznámý'; byAdmin[a] = (byAdmin[a] || 0) + 1
+    }
 
-    return { items }
+    return { total: total || items.length, items, stats: { bySkupina, byAdmin } }
   } catch (e) {
     console.error('parseSection13 error:', e)
     return undefined
@@ -702,7 +1007,6 @@ function parseSection14($: CheerioAPI): Section14 | undefined {
     if (tables.length === 0) return { skupiny: [] }
 
     if (tables.length === 1) {
-      // Single table with skupina column
       const rows = parseTable($, tables[0])
       const bySkupina: Record<string, MarzeProduct[]> = {}
       for (const r of rows) {
@@ -727,7 +1031,6 @@ function parseSection14($: CheerioAPI): Section14 | undefined {
       }
     }
 
-    // Multiple tables per skupin
     const skupiny = tables.map((t, i) => {
       const prevEl = t.prev('h3, h4, b, strong, p')
       const skupina = prevEl.text().trim() || `Skupina ${i + 1}`
@@ -764,17 +1067,70 @@ function parseSection15($: CheerioAPI): Section15 | undefined {
     if (!heading) return undefined
 
     const content = collectSectionContent($, heading)
-    const table = findTable($, content)
-    if (!table) return { kategorie: [] }
 
-    const rows = parseTable($, table)
-    const kategorie = rows.map((r) => ({
-      nazev: r['Kategorie'] || r['Název'] || r['0'] || '',
-      pocet_pravidel: parseNum(r['Pravidel'] || r['Počet pravidel'] || r['1'] || '0'),
-      produktu_mimo: parseNum(r['Produktů mimo'] || r['Mimo'] || r['2'] || '0'),
-    }))
+    const stromy: Section15Strom[] = []
+    let currentStrom: Section15Strom | null = null
 
-    return { kategorie }
+    for (const el of content) {
+      const tag = (el[0] as Element)?.tagName?.toLowerCase()
+      const text = el.text().trim()
+
+      // Tree node heading: h3/h4 or bold
+      if (tag && /^h[3-5]$/.test(tag)) {
+        currentStrom = { nazev: text, kategorie: [] }
+        stromy.push(currentStrom)
+        continue
+      }
+
+      if (tag === 'ul' || tag === 'ol') {
+        el.find('li').each((_, li) => {
+          const t = $(li).text().trim()
+          if (!t) return
+          // Tree node: "N - Název" (no pravidel/produktů)
+          const nodeM = /^(\d+)\s*[-–]\s*(.+)$/.exec(t)
+          if (nodeM && !t.includes('pravidel') && !t.includes('produkt')) {
+            currentStrom = { nazev: nodeM[2].trim(), kategorie: [] }
+            stromy.push(currentStrom)
+            return
+          }
+          // Category: "Název N pravidel | M produktů mimo kategorii"
+          const catM = /^(.+?)\s+(\d+)\s+pravidel\s*[|\/,]\s*(\d+)\s+produkt/i.exec(t)
+          if (catM && currentStrom) {
+            currentStrom.kategorie.push({
+              nazev: catM[1].trim(),
+              pocet_pravidel: parseInt(catM[2], 10),
+              produktu_mimo: parseInt(catM[3], 10),
+            })
+          }
+        })
+        continue
+      }
+
+      // Table fallback — flat table
+      if (tag === 'table') {
+        const rows = parseTable($, el)
+        for (const r of rows) {
+          const nazev = r['Kategorie'] || r['Název'] || r['0'] || ''
+          if (!nazev) continue
+          if (!currentStrom) {
+            currentStrom = { nazev: 'Ostatní', kategorie: [] }
+            stromy.push(currentStrom)
+          }
+          currentStrom.kategorie.push({
+            nazev,
+            pocet_pravidel: parseNum(r['Pravidel'] || r['1'] || '0'),
+            produktu_mimo: parseNum(r['Produktů mimo'] || r['2'] || '0'),
+          })
+        }
+      }
+    }
+
+    // Flat list for export / backward compat
+    const kategorie: Section15Kategorie[] = stromy.flatMap((st) => st.kategorie)
+    const celkem_kategorii = kategorie.length
+    const celkem_mimo = kategorie.reduce((s, k) => s + k.produktu_mimo, 0)
+
+    return { celkem_kategorii, celkem_mimo, kategorie, stromy }
   } catch (e) {
     console.error('parseSection15 error:', e)
     return undefined
@@ -790,8 +1146,19 @@ function computeKPI(sections: ReportSections): ReportKPI {
     sec1_count: sections.sec1?.total ?? sections.sec1?.sample.length ?? 0,
     sec4_count: sections.sec4?.totalUnique ?? 0,
     sec14_count: sections.sec14?.skupiny.reduce((sum, s) => sum + s.produkty.length, 0) ?? 0,
-    sec13_count: sections.sec13?.items.length ?? 0,
+    sec13_count: sections.sec13?.total ?? sections.sec13?.items.length ?? 0,
     sec9_terms: sections.sec9?.terminy.length ?? 0,
+    sec2_count: sections.sec2?.total,
+    sec3_count: sections.sec3?.uniqueCount,
+    sec5_count: sections.sec5?.total,
+    sec6_count: sections.sec6?.total,
+    sec7_count: sections.sec7?.total,
+    sec8_count: sections.sec8?.celkem_mimo,
+    sec9_count: sections.sec9?.items.length,
+    sec10_count: sections.sec10?.items.length,
+    sec11_count: sections.sec11?.celkem_produktu,
+    sec12_count: sections.sec12?.celkem_produktu,
+    sec15_count: sections.sec15?.celkem_mimo,
   }
 }
 
@@ -807,8 +1174,12 @@ export function parseReportEmail(html: string, date: string, fetchedAt: string, 
   try { sections.sec2 = parseSection2($) } catch (e) { console.error('sec2', e) }
   try { sections.sec3 = parseSection3($) } catch (e) { console.error('sec3', e) }
   try { sections.sec4 = parseSection4($) } catch (e) { console.error('sec4', e) }
+  try { sections.sec5 = parseSection5($) } catch (e) { console.error('sec5', e) }
+  try { sections.sec6 = parseSection6($) } catch (e) { console.error('sec6', e) }
   try { sections.sec7 = parseSection7($) } catch (e) { console.error('sec7', e) }
+  try { sections.sec8 = parseSection8($) } catch (e) { console.error('sec8', e) }
   try { sections.sec9 = parseSection9($) } catch (e) { console.error('sec9', e) }
+  try { sections.sec10 = parseSection10($) } catch (e) { console.error('sec10', e) }
   try { sections.sec11 = parseSection11($) } catch (e) { console.error('sec11', e) }
   try { sections.sec12 = parseSection12($) } catch (e) { console.error('sec12', e) }
   try { sections.sec13 = parseSection13($) } catch (e) { console.error('sec13', e) }

@@ -1,28 +1,34 @@
 'use client'
 
-import { Section7 as Section7Type } from '@/types/report'
+import { Section5 as Section5Type } from '@/types/report'
 import { useTableFilter } from '@/hooks/useTableFilter'
+import StatBars from './StatBars'
 
 interface Props {
-  data: Section7Type
+  data: Section5Type
   date: string
 }
 
-export default function Section7({ data, date }: Props) {
-  const { filtered, query, setQuery } = useTableFilter(data.items, ['nazev', 'skupina', 'admin', 'typ'])
+export default function Section5({ data, date }: Props) {
+  const { filtered, query, setQuery } = useTableFilter(data.items, ['nazev', 'skupina', 'admin', 'kod', 'typ'])
 
   return (
     <div>
+      <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <StatBars data={data.stats.bySkupina} title="Skupiny" />
+        <StatBars data={data.stats.byAdmin} title="Admin" />
+      </div>
+
       <div className="mb-3 flex items-center gap-3">
         <input
           type="text"
-          placeholder="Filtr podle názvu, skupiny, admina..."
+          placeholder="Filtr podle kódu, názvu, skupiny, admina..."
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           className="flex-1 rounded border border-gray-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
         <a
-          href={`/api/reports/${date}/export?section=7`}
+          href={`/api/reports/${date}/export?section=5`}
           className="rounded bg-gray-100 px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-200"
         >
           Export CSV
@@ -38,27 +44,23 @@ export default function Section7({ data, date }: Props) {
               <th className="px-3 py-2">Název</th>
               <th className="px-3 py-2">Skupina</th>
               <th className="px-3 py-2">Admin</th>
-              <th className="px-3 py-2 text-right">Skladem</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {filtered.map((item, i) => (
               <tr key={i} className="hover:bg-gray-50">
-                <td className="px-3 py-2 font-mono text-xs text-gray-600">{item.kod}</td>
+                <td className="px-3 py-2 font-mono text-xs text-gray-600">
+                  {item.url ? (
+                    <a href={item.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">{item.kod}</a>
+                  ) : item.kod}
+                </td>
                 <td className="px-3 py-2 text-gray-600">{item.typ}</td>
                 <td className="px-3 py-2 font-medium">{item.nazev}</td>
                 <td className="px-3 py-2 text-gray-600">{item.skupina}</td>
                 <td className="px-3 py-2 text-gray-600">{item.admin}</td>
-                <td className="px-3 py-2 text-right font-medium">{item.skladem}</td>
               </tr>
             ))}
           </tbody>
-          <tfoot>
-            <tr className="border-t-2 border-gray-200 bg-gray-50">
-              <td colSpan={5} className="px-3 py-2 font-semibold">Celkem</td>
-              <td className="px-3 py-2 text-right font-bold">{data.total}</td>
-            </tr>
-          </tfoot>
         </table>
         {filtered.length === 0 && (
           <p className="py-6 text-center text-sm text-gray-400">Žádné výsledky</p>
