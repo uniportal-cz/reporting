@@ -34,18 +34,24 @@ export interface ReportSections {
 
 // Sec 1: Zapnutý v doprodeji bez zásoby
 export interface Section1 {
-  count: number
-  items: { id: string; typ: string; nazev: string; skupina_id: string; skupina_nazev: string; odpovedna_osoba: string }[]
+  total: number          // from "celkem produktů: (N)" — may be larger than sample
+  sample: { id: string; typ: string; nazev: string; skupina_id: string; skupina_nazev: string; admin: string }[]
+  stats: { byType: Record<string, number>; byGroup: Record<string, number> }
 }
 
 // Sec 2: Saleable bez dodavatelského skladu
 export interface Section2 {
-  dodavatele: { dodavatel: string; produkty: { kod: string; nazev: string; skupina: string; admin: string; skladem: number }[] }[]
+  total: number
+  sample: { dodavatel: string; kod: string; nazev: string; skupina: string; admin: string; skladem: number }[]
+  stats: { byDodavatel: Record<string, number>; byGroup: Record<string, number> }
 }
 
 // Sec 3: WithVariant s rozdílnou cenou
 export interface Section3 {
-  items: { id: string; nazev: string; cenik: string; skupina: string; admin: string }[]
+  totalRows: number      // raw line count before dedup
+  uniqueCount: number    // unique IDs
+  sample: { id: string; nazev: string; cenik: string; skupina_id: string; skupina_nazev: string; admin: string }[]
+  stats: { byCenik: Record<string, number>; byGroup: Record<string, number> }
 }
 
 // Sec 4: Nelze doručit

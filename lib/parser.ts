@@ -146,6 +146,23 @@ function findListItems($: CheerioAPI, elements: Cheerio<AnyNode>[]): string[] {
   return items
 }
 
+/** Extract bullet/list lines from content elements — handles <li>, and <p>/<div> starting with • */
+function findBulletLines($: CheerioAPI, elements: Cheerio<AnyNode>[]): string[] {
+  const lines: string[] = []
+  for (const el of elements) {
+    el.find('li').each((_, li) => { const t = $(li).text().trim(); if (t) lines.push(t) })
+    el.find('p, div, td').each((_, p) => {
+      const t = $(p).text().trim()
+      if (t.startsWith('•') || t.startsWith('•') || t.startsWith('·')) {
+        lines.push(t.replace(/^[•·•]\s*/, ''))
+      }
+    })
+    const tag = (el[0] as Element)?.tagName?.toLowerCase()
+    if (tag === 'li') { const t = el.text().trim(); if (t) lines.push(t) }
+  }
+  return lines.filter(Boolean)
+}
+
 // ---------------------------------------------------------------------------
 // Section parsers
 // ---------------------------------------------------------------------------
@@ -159,27 +176,52 @@ function parseSection1($: CheerioAPI): Section1 | undefined {
     ])
     if (!heading) return undefined
 
-    const headingText = heading.text()
-    const count = extractCount(headingText)
     const content = collectSectionContent($, heading)
-    const table = findTable($, content)
-    if (!table) return { count, items: [] }
+    const allText = content.map((el) => el.text()).join('\n')
 
-    const rows = parseTable($, table)
-    const items = rows.map((r) => ({
-      id: r['ID'] || r['Kód'] || r['kod'] || r['0'] || '',
-      typ: r['Typ'] || r['typ'] || r['1'] || '',
-      nazev: r['Název'] || r['nazev'] || r['Produkt'] || r['2'] || '',
-      skupina_id: r['Skupina ID'] || r['skupina_id'] || r['3'] || '',
-      skupina_nazev: r['Skupina'] || r['skupina_nazev'] || r['4'] || '',
-      odpovedna_osoba: r['Odpovědná osoba'] || r['odpovedna_osoba'] || r['Admin'] || r['5'] || '',
-    }))
+    // Total from "celkem produktů: (N)" in content, or from heading
+    let total = extractCount(heading.text())
+    const celkemMatch = /celkem\s+produkt[ůu][:\s]+\(?(\d+)\)?/i.exec(allText)
+    if (celkemMatch) total = parseInt(celkemMatch[1], 10)
 
-    return { count: count || items.length, items }
-  } catch (e) {
-    console.error('parseSection1 error:', e)
-    return undefined
-  }
+    const sample: Section1['sample'] = []
+
+    // Primary: bullet list format — "1423047 (thuleBundle) - Název - 15 | skupina - Admin"
+    const bulletLines = findBulletLines($, content)
+    for (const line of bulletLines) {
+      const m = /^(\d+)\s*\(([^)]+)\)\s*-\s*(.+?)\s*-\s*(\d+)\s*\|\s*(.+?)\s*-\s*(.+)$/.exec(line.trim())
+      if (m) {
+        sample.push({ id: m[1], typ: m[2].trim(), nazev: m[3].trim(), skupina_id: m[4], skupina_nazev: m[5].trim(), admin: m[6].trim() })
+      }
+    }
+
+    // Fallback: table
+    if (sample.length === 0) {
+      const table = findTable($, content)
+      if (table) {
+        parseTable($, table).forEach((r) => {
+          sample.push({
+            id: r['ID'] || r['Kód'] || r['0'] || '',
+            typ: r['Typ'] || r['1'] || '',
+            nazev: r['Název'] || r['2'] || '',
+            skupina_id: r['Skupina ID'] || r['3'] || '',
+            skupina_nazev: r['Skupina'] || r['4'] || '',
+            admin: r['Odpovědná osoba'] || r['Admin'] || r['5'] || '',
+          })
+        })
+      }
+    }
+
+    const byType: Record<string, number> = {}
+    const byGroup: Record<string, number> = {}
+    for (const item of sample) {
+      const t = item.typ || 'Neznámý'; byType[t] = (byType[t] || 0) + 1
+      const g = item.skupina_id ? `${item.skupina_id} | ${item.skupina_nazev}` : item.skupina_nazev || 'Neznámá'
+      byGroup[g] = (byGroup[g] || 0) + 1
+    }
+
+    return { total: total || sample.length, sample, stats: { byType, byGroup } }
+  } catch (e) { console.error('parseSection1 error:', e); return undefined }
 }
 
 function parseSection2($: CheerioAPI): Section2 | undefined {
@@ -192,49 +234,46 @@ function parseSection2($: CheerioAPI): Section2 | undefined {
     if (!heading) return undefined
 
     const content = collectSectionContent($, heading)
+    const sample: Section2['sample'] = []
     const tables = findTables($, content)
 
-    if (tables.length === 0) {
-      // try to parse single table
-      const table = findTable($, content)
-      if (!table) return { dodavatele: [] }
-      const rows = parseTable($, table)
-      const byDodavatel: Record<string, { kod: string; nazev: string; skupina: string; admin: string; skladem: number }[]> = {}
+    const addRows = (rows: Record<string, string>[], dodavatelOverride?: string) => {
       for (const r of rows) {
-        const d = r['Dodavatel'] || r['dodavatel'] || r['0'] || 'Neznámý'
-        if (!byDodavatel[d]) byDodavatel[d] = []
-        byDodavatel[d].push({
-          kod: r['Kód'] || r['kod'] || r['1'] || '',
+        const kod = r['Kód'] || r['kod'] || r['1'] || r['0'] || ''
+        if (!kod || /celkem/i.test(kod)) continue  // skip subtotal rows
+        sample.push({
+          dodavatel: dodavatelOverride || r['Dodavatel'] || r['dodavatel'] || r['0'] || '',
+          kod,
           nazev: r['Název'] || r['2'] || '',
           skupina: r['Skupina'] || r['3'] || '',
           admin: r['Admin'] || r['4'] || '',
-          skladem: parseNum(r['Skladem'] || r['5'] || '0'),
+          skladem: parseNum(r['Skladem u dodavatele'] || r['Skladem'] || r['5'] || '0'),
         })
-      }
-      return {
-        dodavatele: Object.entries(byDodavatel).map(([dodavatel, produkty]) => ({ dodavatel, produkty })),
       }
     }
 
-    // Multiple tables — each table is a supplier
-    const dodavatele = tables.map((t, i) => {
-      const dodavatel = t.prev('h3, h4, b, strong, p').text().trim() || `Dodavatel ${i + 1}`
-      const rows = parseTable($, t)
-      const produkty = rows.map((r) => ({
-        kod: r['Kód'] || r['kod'] || r['0'] || '',
-        nazev: r['Název'] || r['1'] || '',
-        skupina: r['Skupina'] || r['2'] || '',
-        admin: r['Admin'] || r['3'] || '',
-        skladem: parseNum(r['Skladem'] || r['4'] || '0'),
-      }))
-      return { dodavatel, produkty }
-    })
+    if (tables.length === 0) {
+      const table = findTable($, content)
+      if (table) addRows(parseTable($, table))
+    } else if (tables.length === 1) {
+      addRows(parseTable($, tables[0]))
+    } else {
+      // Multiple tables — each headed by a supplier name
+      for (const t of tables) {
+        const prevText = t.prev('h3, h4, b, strong, p').text().trim()
+        addRows(parseTable($, t), prevText || undefined)
+      }
+    }
 
-    return { dodavatele }
-  } catch (e) {
-    console.error('parseSection2 error:', e)
-    return undefined
-  }
+    const byDodavatel: Record<string, number> = {}
+    const byGroup: Record<string, number> = {}
+    for (const item of sample) {
+      const d = item.dodavatel || 'Neznámý'; byDodavatel[d] = (byDodavatel[d] || 0) + 1
+      const g = item.skupina || 'Neznámá'; byGroup[g] = (byGroup[g] || 0) + 1
+    }
+
+    return { total: sample.length, sample, stats: { byDodavatel, byGroup } }
+  } catch (e) { console.error('parseSection2 error:', e); return undefined }
 }
 
 function parseSection3($: CheerioAPI): Section3 | undefined {
@@ -247,23 +286,51 @@ function parseSection3($: CheerioAPI): Section3 | undefined {
     if (!heading) return undefined
 
     const content = collectSectionContent($, heading)
-    const table = findTable($, content)
-    if (!table) return { items: [] }
+    const allRows: Section3['sample'] = []
 
-    const rows = parseTable($, table)
-    const items = rows.map((r) => ({
-      id: r['ID'] || r['Kód'] || r['0'] || '',
-      nazev: r['Název'] || r['1'] || '',
-      cenik: r['Ceník'] || r['Cena'] || r['2'] || '',
-      skupina: r['Skupina'] || r['3'] || '',
-      admin: r['Admin'] || r['4'] || '',
-    }))
+    // Primary: bullet format — "1356003 - Název - ceník: MOC PL - 14 | skupina - Admin"
+    const bulletLines = findBulletLines($, content)
+    for (const line of bulletLines) {
+      const m = /^(\d+)\s*-\s*(.+?)\s*-\s*ceník:\s*(.+?)\s*-\s*(\d+)\s*\|\s*(.+?)\s*-\s*(.+)$/.exec(line.trim())
+      if (m) {
+        allRows.push({ id: m[1], nazev: m[2].trim(), cenik: m[3].trim(), skupina_id: m[4], skupina_nazev: m[5].trim(), admin: m[6].trim() })
+      }
+    }
 
-    return { items }
-  } catch (e) {
-    console.error('parseSection3 error:', e)
-    return undefined
-  }
+    // Fallback: table
+    if (allRows.length === 0) {
+      const table = findTable($, content)
+      if (table) {
+        parseTable($, table).forEach((r) => {
+          allRows.push({
+            id: r['ID'] || r['Kód'] || r['0'] || '',
+            nazev: r['Název'] || r['1'] || '',
+            cenik: r['Ceník'] || r['Cena'] || r['2'] || '',
+            skupina_id: '',
+            skupina_nazev: r['Skupina'] || r['3'] || '',
+            admin: r['Admin'] || r['4'] || '',
+          })
+        })
+      }
+    }
+
+    const totalRows = allRows.length
+
+    // Dedup by ID — keep first occurrence
+    const seen = new Set<string>()
+    const sample = allRows.filter((row) => { if (seen.has(row.id)) return false; seen.add(row.id); return true })
+    const uniqueCount = sample.length
+
+    const byCenik: Record<string, number> = {}
+    const byGroup: Record<string, number> = {}
+    for (const item of sample) {
+      const c = item.cenik || 'Neznámý'; byCenik[c] = (byCenik[c] || 0) + 1
+      const g = item.skupina_id ? `${item.skupina_id} | ${item.skupina_nazev}` : item.skupina_nazev || 'Neznámá'
+      byGroup[g] = (byGroup[g] || 0) + 1
+    }
+
+    return { totalRows, uniqueCount, sample, stats: { byCenik, byGroup } }
+  } catch (e) { console.error('parseSection3 error:', e); return undefined }
 }
 
 function parseSection4($: CheerioAPI): Section4 | undefined {
@@ -583,7 +650,7 @@ function parseSection15($: CheerioAPI): Section15 | undefined {
 
 function computeKPI(sections: ReportSections): ReportKPI {
   return {
-    sec1_count: sections.sec1?.count ?? sections.sec1?.items.length ?? 0,
+    sec1_count: sections.sec1?.total ?? sections.sec1?.sample.length ?? 0,
     sec4_count: sections.sec4?.zeme.reduce((sum, z) => sum + z.produkty.length, 0) ?? 0,
     sec14_count: sections.sec14?.skupiny.reduce((sum, s) => sum + s.produkty.length, 0) ?? 0,
     sec13_count: sections.sec13?.items.length ?? 0,

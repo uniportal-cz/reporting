@@ -10,7 +10,7 @@ function sectionToCsv(report: Report, section: string): string {
 
   switch (section) {
     case '1': {
-      const items = s.sec1?.items ?? []
+      const items = s.sec1?.sample ?? []
       return Papa.unparse(
         items.map((i) => ({
           ID: i.id,
@@ -18,22 +18,19 @@ function sectionToCsv(report: Report, section: string): string {
           Název: i.nazev,
           'Skupina ID': i.skupina_id,
           Skupina: i.skupina_nazev,
-          'Odpovědná osoba': i.odpovedna_osoba,
+          Admin: i.admin,
         }))
       )
     }
     case '2': {
-      const rows: Record<string, string | number>[] = []
-      for (const d of s.sec2?.dodavatele ?? []) {
-        for (const p of d.produkty) {
-          rows.push({ Dodavatel: d.dodavatel, Kód: p.kod, Název: p.nazev, Skupina: p.skupina, Admin: p.admin, Skladem: p.skladem })
-        }
-      }
-      return Papa.unparse(rows)
+      const items = s.sec2?.sample ?? []
+      return Papa.unparse(
+        items.map((i) => ({ Dodavatel: i.dodavatel, Kód: i.kod, Název: i.nazev, Skupina: i.skupina, Admin: i.admin, Skladem: i.skladem }))
+      )
     }
     case '3': {
-      const items = s.sec3?.items ?? []
-      return Papa.unparse(items.map((i) => ({ ID: i.id, Název: i.nazev, Ceník: i.cenik, Skupina: i.skupina, Admin: i.admin })))
+      const items = s.sec3?.sample ?? []
+      return Papa.unparse(items.map((i) => ({ ID: i.id, Název: i.nazev, Ceník: i.cenik, 'Skupina ID': i.skupina_id, Skupina: i.skupina_nazev, Admin: i.admin })))
     }
     case '4': {
       const rows: Record<string, string>[] = []

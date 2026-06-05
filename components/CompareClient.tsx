@@ -219,7 +219,7 @@ export default function CompareClient({ reports, allDates, selectedDates, active
                 sorted.forEach((r) => {
                   const sec = r.sections[secKey]
                   if (!sec) return
-                  if (secKey === 'sec1') (sec as any).items?.forEach((p: any) => allCodes.add(p.id || p.kod || ''))
+                  if (secKey === 'sec1') (sec as any).sample?.forEach((p: any) => allCodes.add(p.id || p.kod || ''))
                   if (secKey === 'sec13') (sec as any).items?.forEach((p: any) => allCodes.add(p.kod || ''))
                   if (secKey === 'sec14') (sec as any).skupiny?.forEach((s: any) => s.produkty?.forEach((p: any) => allCodes.add(p.kod || '')))
                 })
@@ -247,7 +247,7 @@ export default function CompareClient({ reports, allDates, selectedDates, active
                             const presence = sorted.map((r) => {
                               const sec = r.sections[secKey]
                               if (!sec) return false
-                              if (secKey === 'sec1') return (sec as any).items?.some((p: any) => (p.id || p.kod) === code)
+                              if (secKey === 'sec1') return (sec as any).sample?.some((p: any) => (p.id || p.kod) === code)
                               if (secKey === 'sec13') return (sec as any).items?.some((p: any) => p.kod === code)
                               if (secKey === 'sec14') return (sec as any).skupiny?.some((s: any) => s.produkty?.some((p: any) => p.kod === code))
                               return false

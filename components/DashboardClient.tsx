@@ -280,7 +280,7 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
               <CollapsibleSection
                 title="1. Zapnutý produkt v doprodeji bez zásoby"
                 description="Nabídka něčeho, co nejsme schopni dodat — produkt je aktivní v doprodeji, ale není k dispozici žádná zásoba."
-                badge={s.sec1?.count ?? 0}
+                badge={s.sec1?.total ?? 0}
                 badgeColor="orange"
               >
                 {s.sec1 && <Section1 data={s.sec1} date={report.date} />}
@@ -289,7 +289,7 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
               <CollapsibleSection
                 title="2. Saleable bez dodavatelského skladu"
                 description="Produkt je označen jako prodejný, ale není napojen na žádný dodavatelský sklad — nelze zajistit zásobování."
-                badge={s.sec2 ? s.sec2.dodavatele.reduce((n, d) => n + d.produkty.length, 0) : 0}
+                badge={s.sec2?.total ?? 0}
                 badgeColor="blue"
               >
                 {s.sec2 && <Section2 data={s.sec2} date={report.date} />}
@@ -298,7 +298,7 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
               <CollapsibleSection
                 title="3. WithVariant s rozdílnou cenou"
                 description="Variantní produkty mají nekonzistentní ceny — různé varianty téhož produktu se liší cenou, což může způsobit zobrazení špatné ceny."
-                badge={s.sec3?.items.length ?? 0}
+                badge={s.sec3?.uniqueCount ?? 0}
                 badgeColor="blue"
               >
                 {s.sec3 && <Section3 data={s.sec3} date={report.date} />}
