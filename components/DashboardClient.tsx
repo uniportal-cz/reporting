@@ -138,29 +138,43 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
   const [fetching, setFetching] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [loadedUids, setLoadedUids] = useState<Set<number>>(new Set())
+  // UID of the currently-viewed stored report's email (for forced re-fetch)
+  const [storedEmailUid, setStoredEmailUid] = useState<number | null>(null)
 
   function handleEmailClick(email: EmailSummary) {
+    const dateStr = email.date.slice(0, 10)
+    const isStored = index.reports.some(r => r.date === dateStr) || loadedUids.has(email.uid)
+
+    if (isStored) {
+      setSelectedEmail(null)
+      setFetchError(null)
+      setStoredEmailUid(email.uid)
+      router.push(`/dashboard?type=${activeType}&date=${dateStr}`)
+      return
+    }
+
+    setStoredEmailUid(null)
     setSelectedEmail(prev => prev?.uid === email.uid ? null : email)
     setFetchError(null)
   }
 
-  async function handleLoadReport() {
-    if (!selectedEmail) return
+  async function fetchReport(uid: number) {
     setFetching(true)
     setFetchError(null)
     try {
       const res = await fetch('/api/fetch-report', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ uid: selectedEmail.uid, reportType: activeType }),
+        body: JSON.stringify({ uid, reportType: activeType }),
       })
       const data = await res.json()
       if (!res.ok) {
         setFetchError(data.error || 'Chyba při stahování')
       } else {
-        setLoadedUids(prev => new Set(prev).add(selectedEmail.uid))
+        setLoadedUids(prev => new Set(prev).add(uid))
         setLiveReport(data.report)
         setSelectedEmail(null)
+        setStoredEmailUid(null)
         router.push(`/dashboard?type=${activeType}&date=${data.date}`)
       }
     } catch {
@@ -168,6 +182,10 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
     } finally {
       setFetching(false)
     }
+  }
+
+  function handleLoadReport() {
+    if (selectedEmail) fetchReport(selectedEmail.uid)
   }
 
   const s = report.sections
@@ -322,16 +340,31 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
         <main className="flex-1 overflow-y-auto">
           {/* Report header */}
           <div className="border-b border-gray-200 bg-white px-6 py-3">
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold text-gray-900">
-                {isValid(parseISO(report.date))
-                  ? format(parseISO(report.date), "EEEE d. MMMM yyyy", { locale: cs })
-                  : report.date}
-              </h2>
-              {report.fetchedAt && (
-                <span className="text-xs text-gray-400">
-                  · načteno {format(new Date(report.fetchedAt), 'H:mm', { locale: cs })}
-                </span>
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-semibold text-gray-900">
+                  {isValid(parseISO(report.date))
+                    ? format(parseISO(report.date), "EEEE d. MMMM yyyy", { locale: cs })
+                    : report.date}
+                </h2>
+                {report.fetchedAt && (
+                  <span className="text-xs text-gray-400">
+                    · načteno {format(new Date(report.fetchedAt), 'H:mm', { locale: cs })}
+                  </span>
+                )}
+              </div>
+              {storedEmailUid !== null && (
+                <button
+                  onClick={() => fetchReport(storedEmailUid!)}
+                  disabled={fetching}
+                  title="Znovu stáhnout a přeparsovat z emailu"
+                  className="flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors disabled:opacity-40"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Znovu stáhnout
+                </button>
               )}
             </div>
           </div>
