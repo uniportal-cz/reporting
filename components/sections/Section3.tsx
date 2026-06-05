@@ -45,6 +45,13 @@ export default function Section3({ data, date }: Props) {
         </a>
       </div>
 
+      {data.sample.length > 0 && (
+        <div className="grid grid-cols-2 gap-6 border-b border-gray-100 pb-4">
+          <StatBars title="Rozdělení dle ceníku" data={data.stats.byCenik} colorClass="bg-purple-400" />
+          <StatBars title="Rozdělení dle skupiny" data={data.stats.byGroup} colorClass="bg-orange-400" />
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="min-w-full text-sm">
           <thead>
@@ -74,13 +81,6 @@ export default function Section3({ data, date }: Props) {
         </table>
         {sorted.length === 0 && <p className="py-6 text-center text-sm text-gray-400">Žádné výsledky</p>}
       </div>
-
-      {data.sample.length > 0 && (
-        <div className="grid grid-cols-2 gap-6 border-t border-gray-100 pt-4">
-          <StatBars title="Rozdělení dle ceníku" data={data.stats.byCenik} colorClass="bg-purple-400" />
-          <StatBars title="Rozdělení dle skupiny" data={data.stats.byGroup} colorClass="bg-orange-400" />
-        </div>
-      )}
     </div>
   )
 }
