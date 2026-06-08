@@ -26,6 +26,15 @@ export const REPORT_TYPES: ReportTypeConfig[] = [
       return s.includes('skladový report') || s.includes('skladovy report')
     },
   },
+  {
+    id: 'ucetni',
+    label: 'Účetní',
+    subjectKeyword: 'etni report',
+    matchSubject: (subject: string) => {
+      const s = subject.toLowerCase()
+      return (s.includes('účetní report') || s.includes('ucetni report')) && s.includes('nákupní')
+    },
+  },
 ]
 
 export const DEFAULT_REPORT_TYPE = 'obchodni'

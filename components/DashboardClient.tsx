@@ -35,6 +35,12 @@ const SkSec6 = lazy(() => import('./sections/SkSec6'))
 const SkSec7 = lazy(() => import('./sections/SkSec7'))
 const SkSec8 = lazy(() => import('./sections/SkSec8'))
 
+// Accounting sections
+const UcSec1 = lazy(() => import('./sections/UcSec1'))
+const UcSec2 = lazy(() => import('./sections/UcSec2'))
+const UcSec3 = lazy(() => import('./sections/UcSec3'))
+const UcSec4 = lazy(() => import('./sections/UcSec4'))
+
 // ─── KPI Chip Bar ────────────────────────────────────────────────────────────
 
 interface KpiChip {
@@ -238,6 +244,16 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
     { id: 'sk8', label: '8 Blokace pultů', value: kpi.sk_sec8_count, prev: prevKpi?.sk_sec8_count, color: 'red' },
   ]
 
+  const kpiChipsUcetni: KpiChip[] = [
+    { id: 'uc1', label: '1 Nedoručeno', value: kpi.uc_sec1_count, prev: prevKpi?.uc_sec1_count, color: 'orange' },
+    { id: 'uc2', label: '2 Faktury', value: kpi.uc_sec2_count, prev: prevKpi?.uc_sec2_count, color: 'blue' },
+    { id: 'uc2b', label: '2b Po splatnosti', value: kpi.uc_sec2b_count, prev: prevKpi?.uc_sec2b_count, color: 'red' },
+    { id: 'uc3a', label: '3a Nevykr. příj.', value: kpi.uc_sec3a_count, prev: prevKpi?.uc_sec3a_count, color: 'red' },
+    { id: 'uc3b', label: '3b Nevykryto ks', value: kpi.uc_sec3b_count, prev: prevKpi?.uc_sec3b_count, color: 'orange' },
+    { id: 'uc3c', label: '3c Nadměrně vyk.', value: kpi.uc_sec3c_count, prev: prevKpi?.uc_sec3c_count, color: 'orange' },
+    { id: 'uc4', label: '4 Zásoby limit', value: kpi.uc_sec4_count, prev: prevKpi?.uc_sec4_count, color: 'purple' },
+  ]
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
 
@@ -391,7 +407,48 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
           </div>
 
           <div className="px-6 py-5 space-y-4">
-            {activeType === 'skladovy' ? (
+            {activeType === 'ucetni' ? (
+              <>
+                <KpiChipBar chips={kpiChipsUcetni} />
+                <div className="space-y-2">
+                  <CollapsibleSection
+                    title="1. Nedoručené zboží"
+                    description="Zboží z uzavřených nebo rozpracovaných objednávek, které ještě nebylo doručeno."
+                    badge={s.uc_sec1?.total_ks ?? 0}
+                    badgeColor="orange"
+                  >
+                    {s.uc_sec1 && <UcSec1 data={s.uc_sec1} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="2. Faktury přijaté"
+                    description="Přehled přijatých faktur dle měny a informace o fakturách po splatnosti."
+                    badge={s.uc_sec2?.total ?? 0}
+                    badgeColor={s.uc_sec2?.po_splatnosti ? 'red' : 'blue'}
+                  >
+                    {s.uc_sec2 && <UcSec2 data={s.uc_sec2} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="3. Vykrytí příjemek"
+                    description="Nevykryté a nadměrně vykryté příjemky — zboží přijaté bez odpovídající faktury nebo s přebytkem."
+                    badge={s.uc_sec3?.nevykryte_count ?? 0}
+                    badgeColor="red"
+                  >
+                    {s.uc_sec3 && <UcSec3 data={s.uc_sec3} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="4. Zásoby přes limit autoobjednání"
+                    description="Položky, jejichž zásoby překračují nastavený limit pro autoobjednání — vyžadují kontrolu."
+                    badge={s.uc_sec4?.items.length ?? 0}
+                    badgeColor="purple"
+                  >
+                    {s.uc_sec4 && <UcSec4 data={s.uc_sec4} date={report.date} />}
+                  </CollapsibleSection>
+                </div>
+              </>
+            ) : activeType === 'skladovy' ? (
               <>
                 <KpiChipBar chips={kpiChipsSkladovy} />
                 <div className="space-y-2">

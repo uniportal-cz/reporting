@@ -29,6 +29,14 @@ export interface ReportKPI {
   sk_sec6_count?: number   // Úkoly na kase
   sk_sec7_count?: number   // Korekce (7 dní)
   sk_sec8_count?: number   // Blokace pultů
+  // Accounting (Účetní) report KPI fields
+  uc_sec1_count?: number   // Nedoručené zboží (ks)
+  uc_sec2_count?: number   // Přijaté faktury
+  uc_sec2b_count?: number  // Faktury po splatnosti
+  uc_sec3a_count?: number  // Nevykryté příjemky (počet)
+  uc_sec3b_count?: number  // Nevykryto ks
+  uc_sec3c_count?: number  // Nadměrně vykryté příjemky
+  uc_sec4_count?: number   // Zásoby přes limit
 }
 
 export interface Report {
@@ -64,6 +72,11 @@ export interface ReportSections {
   sk_sec6?: SkSec6
   sk_sec7?: SkSec7
   sk_sec8?: SkSec8
+  // Accounting (Účetní) report sections
+  uc_sec1?: UcSec1
+  uc_sec2?: UcSec2
+  uc_sec3?: UcSec3
+  uc_sec4?: UcSec4
 }
 
 // Sec 1: Zapnutý v doprodeji bez zásoby
@@ -285,6 +298,54 @@ export interface SkSec8 {
     avg_doba_min?: number
   }
 }
+
+// ─── Accounting (Účetní) report section types ─────────────────────────────
+
+export interface UcSec1Item {
+  dodavatel: string
+  ks_closed: number
+  ks_inprocess: number
+}
+
+export interface UcSec1 {
+  total_ks: number
+  ks_closed: number
+  ks_inprocess: number
+  items: UcSec1Item[]
+}
+
+export interface UcSec2Mena {
+  mena: string
+  suma: number
+  pocet: number
+}
+
+export interface UcSec2 {
+  total: number
+  po_splatnosti: number
+  meny: UcSec2Mena[]
+  meny_po_splatnosti: UcSec2Mena[]
+  faktury_po_splatnosti: { id: string; url?: string }[]
+  poznamka?: string
+}
+
+export interface UcSec3Prijemka {
+  id: string
+  url?: string
+  datum?: string    // ISO date YYYY-MM-DD
+  nevykryto: number // positive = unfulfilled, negative = over-fulfilled
+  celkem?: number
+  dodavatel: string // '-' if no supplier
+}
+
+export interface UcSec3 {
+  nevykryte_count: number   // from header "celkem N"
+  nevykryte_ks: number      // sum of all nevykryto where > 0
+  nadmerne_count: number    // from header "celkem N"
+  prijemky: UcSec3Prijemka[]
+}
+
+export type UcSec4 = Section10
 
 // Sec 15: Nesoulad kategorizace
 export interface Section15Kategorie {
