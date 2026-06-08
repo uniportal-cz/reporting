@@ -11,10 +11,19 @@ export const REPORT_TYPES: ReportTypeConfig[] = [
   {
     id: 'obchodni',
     label: 'Obchodní',
-    subjectKeyword: 'Obchodn', // prefix without diacritics to be safe with IMAP SEARCH
+    subjectKeyword: 'Obchodn',
     matchSubject: (subject: string) => {
       const s = subject.toLowerCase()
       return s.includes('obchodní report') || s.includes('obchodni report')
+    },
+  },
+  {
+    id: 'skladovy',
+    label: 'Skladový',
+    subjectKeyword: 'Skladov',
+    matchSubject: (subject: string) => {
+      const s = subject.toLowerCase()
+      return s.includes('skladový report') || s.includes('skladovy report')
     },
   },
 ]

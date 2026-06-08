@@ -20,6 +20,15 @@ export interface ReportKPI {
   sec11_count?: number
   sec12_count?: number
   sec15_count?: number
+  // Warehouse (Skladový) report KPI fields
+  sk_sec1_count?: number   // Provizorní balíky
+  sk_sec2_count?: number   // Nepodané balíky ČP
+  sk_sec3_count?: number   // Fronta objednávek
+  sk_sec4_count?: number   // Rozpracované převodky
+  sk_sec5_count?: number   // Úkoly na šarže
+  sk_sec6_count?: number   // Úkoly na kase
+  sk_sec7_count?: number   // Korekce (7 dní)
+  sk_sec8_count?: number   // Blokace pultů
 }
 
 export interface Report {
@@ -46,6 +55,15 @@ export interface ReportSections {
   sec13?: Section13
   sec14?: Section14
   sec15?: Section15
+  // Warehouse (Skladový) report sections
+  sk_sec1?: SkSec1
+  sk_sec2?: SkSec2
+  sk_sec3?: SkSec3
+  sk_sec4?: SkSec4
+  sk_sec5?: SkSec5
+  sk_sec6?: SkSec6
+  sk_sec7?: SkSec7
+  sk_sec8?: SkSec8
 }
 
 // Sec 1: Zapnutý v doprodeji bez zásoby
@@ -166,6 +184,106 @@ export interface MarzeProduct {
   marze_CZ: number; marze_IT: number; marze_CH: number; marze_WEU: number
   marze_SK: number; marze_PL: number; marze_GB: number; marze_DEAT: number
   skladem: number
+}
+
+// ─── Warehouse (Skladový) report section types ─────────────────────────────
+
+export interface SkSec1Balik {
+  objednavka: string
+  objednavka_url?: string
+  dopravce: string
+  stav: string
+  vytvoreno?: string   // ISO datetime
+  uzavreno?: string    // ISO datetime
+  prodleva_min?: number
+  duvod: string
+  odpovida: string
+}
+
+export interface SkSec1 {
+  total: number
+  baliky: SkSec1Balik[]
+  stats: { byDuvod: Record<string, number>; byDopravce: Record<string, number> }
+}
+
+export interface SkSec2 {
+  total: number
+  nejstarsi?: string  // ISO datetime
+}
+
+export interface SkSec3Item {
+  sklad: string
+  k_hledani: number
+  k_baleni: number
+  celkem: number
+}
+
+export interface SkSec3 {
+  total: number
+  k_hledani: number
+  k_baleni: number
+  sklady: SkSec3Item[]
+}
+
+export interface SkSec4Item {
+  id: string
+  id_url?: string
+  vytvoreno?: string  // ISO datetime
+  ze: string
+  do: string
+}
+
+export interface SkSec4 {
+  total: number
+  items: SkSec4Item[]
+}
+
+export interface SkSecUkolItem {
+  sklad: string
+  pocet: number
+  nejstarsi?: string  // ISO datetime
+}
+
+export interface SkSec5 {
+  total: number
+  items: SkSecUkolItem[]
+}
+
+export type SkSec6 = SkSec5
+
+export interface SkSec7Item {
+  kategorie: string
+  plus: number
+  minus: number
+  celkem: number
+}
+
+export interface SkSec7 {
+  total: number
+  items: SkSec7Item[]
+  odkaz?: string
+}
+
+export interface SkSec8Item {
+  pult: string
+  pracovnik: string
+  cas_blokace: string   // ISO datetime
+  produkt_nazev: string
+  produkt_kod: string
+  doklad: string
+  odblokoval: string
+  cas_odblokovani?: string   // ISO datetime, undefined = still locked
+  doba_blokace_min?: number
+}
+
+export interface SkSec8 {
+  total: number
+  items: SkSec8Item[]
+  stats: {
+    byPracovnik: Record<string, number>
+    byPult: Record<string, number>
+    avg_doba_min?: number
+  }
 }
 
 // Sec 15: Nesoulad kategorizace

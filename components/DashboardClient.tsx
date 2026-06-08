@@ -25,6 +25,16 @@ const Section13 = lazy(() => import('./sections/Section13'))
 const Section14 = lazy(() => import('./sections/Section14'))
 const Section15 = lazy(() => import('./sections/Section15'))
 
+// Warehouse sections
+const SkSec1 = lazy(() => import('./sections/SkSec1'))
+const SkSec2 = lazy(() => import('./sections/SkSec2'))
+const SkSec3 = lazy(() => import('./sections/SkSec3'))
+const SkSec4 = lazy(() => import('./sections/SkSec4'))
+const SkSec5 = lazy(() => import('./sections/SkSec5'))
+const SkSec6 = lazy(() => import('./sections/SkSec6'))
+const SkSec7 = lazy(() => import('./sections/SkSec7'))
+const SkSec8 = lazy(() => import('./sections/SkSec8'))
+
 // ─── KPI Chip Bar ────────────────────────────────────────────────────────────
 
 interface KpiChip {
@@ -217,6 +227,17 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
     { id: 'sec15', label: '15 Nesoulad', value: kpi.sec15_count, prev: prevKpi?.sec15_count, color: 'gray' },
   ]
 
+  const kpiChipsSkladovy: KpiChip[] = [
+    { id: 'sk1', label: '1 Proviz. balíky', value: kpi.sk_sec1_count, prev: prevKpi?.sk_sec1_count, color: 'orange' },
+    { id: 'sk2', label: '2 Balíky ČP', value: kpi.sk_sec2_count, prev: prevKpi?.sk_sec2_count, color: 'red' },
+    { id: 'sk3', label: '3 Fronta obj.', value: kpi.sk_sec3_count, prev: prevKpi?.sk_sec3_count, color: 'blue' },
+    { id: 'sk4', label: '4 Převodky', value: kpi.sk_sec4_count, prev: prevKpi?.sk_sec4_count, color: 'orange' },
+    { id: 'sk5', label: '5 Úk. šarže', value: kpi.sk_sec5_count, prev: prevKpi?.sk_sec5_count, color: 'purple' },
+    { id: 'sk6', label: '6 Úk. kasa', value: kpi.sk_sec6_count, prev: prevKpi?.sk_sec6_count, color: 'purple' },
+    { id: 'sk7', label: '7 Korekce', value: kpi.sk_sec7_count, prev: prevKpi?.sk_sec7_count, color: 'gray' },
+    { id: 'sk8', label: '8 Blokace pultů', value: kpi.sk_sec8_count, prev: prevKpi?.sk_sec8_count, color: 'red' },
+  ]
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-gray-50">
 
@@ -370,146 +391,227 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
           </div>
 
           <div className="px-6 py-5 space-y-4">
-            {/* KPI Chip Bar */}
-            <KpiChipBar chips={kpiChips} />
+            {activeType === 'skladovy' ? (
+              <>
+                <KpiChipBar chips={kpiChipsSkladovy} />
+                <div className="space-y-2">
+                  <CollapsibleSection
+                    title="1. Provizorní balíky"
+                    description="Balíky, které byly provizorně uzavřeny — nelze je standardně odeslat a čekají na ruční řešení."
+                    badge={s.sk_sec1?.total ?? 0}
+                    badgeColor="orange"
+                  >
+                    {s.sk_sec1 && <SkSec1 data={s.sk_sec1} date={report.date} />}
+                  </CollapsibleSection>
 
-            {/* Sections — always rendered, green when empty */}
-            <div className="space-y-2">
-              <CollapsibleSection
-                title="1. Zapnutý produkt v doprodeji bez zásoby"
-                description="Nabídka něčeho, co nejsme schopni dodat — produkt je aktivní v doprodeji, ale není k dispozici žádná zásoba."
-                badge={s.sec1?.total ?? 0}
-                badgeColor="orange"
-              >
-                {s.sec1 && <Section1 data={s.sec1} date={report.date} />}
-              </CollapsibleSection>
+                  <CollapsibleSection
+                    title="2. Nepodané balíky ČP"
+                    description="Balíky připravené pro Českou poštu, které ještě nebyly předány dopravci."
+                    badge={s.sk_sec2?.total ?? 0}
+                    badgeColor="red"
+                  >
+                    {s.sk_sec2 && <SkSec2 data={s.sk_sec2} date={report.date} />}
+                  </CollapsibleSection>
 
-              <CollapsibleSection
-                title="2. Saleable bez dodavatelského skladu"
-                description="Produkt je označen jako prodejný, ale není napojen na žádný dodavatelský sklad — nelze zajistit zásobování."
-                badge={s.sec2?.total ?? 0}
-                badgeColor="blue"
-              >
-                {s.sec2 && <Section2 data={s.sec2} date={report.date} />}
-              </CollapsibleSection>
+                  <CollapsibleSection
+                    title="3. Objednávky ve frontě"
+                    description="Celkový počet objednávek čekajících na zpracování — k hledání a k balení dle skladu."
+                    badge={s.sk_sec3?.total ?? 0}
+                    badgeColor="blue"
+                  >
+                    {s.sk_sec3 && <SkSec3 data={s.sk_sec3} date={report.date} />}
+                  </CollapsibleSection>
 
-              <CollapsibleSection
-                title="3. WithVariant s rozdílnou cenou"
-                description="Variantní produkty mají nekonzistentní ceny — různé varianty téhož produktu se liší cenou, což může způsobit zobrazení špatné ceny."
-                badge={s.sec3?.uniqueCount ?? 0}
-                badgeColor="blue"
-              >
-                {s.sec3 && <Section3 data={s.sec3} date={report.date} />}
-              </CollapsibleSection>
+                  <CollapsibleSection
+                    title="4. Rozpracované převodky"
+                    description="Meziskladové převodky, které nebyly dokončeny — zboží je mezi sklady a není dostupné."
+                    badge={s.sk_sec4?.total ?? 0}
+                    badgeColor="orange"
+                  >
+                    {s.sk_sec4 && <SkSec4 data={s.sk_sec4} date={report.date} />}
+                  </CollapsibleSection>
 
-              <CollapsibleSection
-                title="4. Nelze doručit"
-                description="Produkty, které nelze doručit — jsou aktivní, ale jejich konfigurace dopravy nebo dostupnost to neumožňuje."
-                badge={kpi.sec4_count}
-                badgeColor="red"
-              >
-                {s.sec4 && <Section4 data={s.sec4} date={report.date} />}
-              </CollapsibleSection>
+                  <CollapsibleSection
+                    title="5. Nesplněné úkoly na šarže"
+                    description="Přiřazené, ale dosud nesplněné úkoly týkající se šarží — mohou blokovat příjem nebo expedici."
+                    badge={s.sk_sec5?.total ?? 0}
+                    badgeColor="purple"
+                  >
+                    {s.sk_sec5 && <SkSec5 data={s.sk_sec5} date={report.date} />}
+                  </CollapsibleSection>
 
-              <CollapsibleSection
-                title="5. Produkty s TARIC kódem — nelze odeslat"
-                description="Produkty mají vyplněný TARIC kód, ale z technických důvodů je nelze odeslat do zahraničí."
-                badge={s.sec5?.total ?? 0}
-                badgeColor="orange"
-              >
-                {s.sec5 && <Section5 data={s.sec5} date={report.date} />}
-              </CollapsibleSection>
+                  <CollapsibleSection
+                    title="6. Nesplněné úkoly na kase"
+                    description="Přiřazené, ale dosud nesplněné úkoly na pokladně — mohou zdržovat prodejní operace."
+                    badge={s.sk_sec6?.total ?? 0}
+                    badgeColor="purple"
+                  >
+                    {s.sk_sec6 && <SkSec6 data={s.sk_sec6} date={report.date} />}
+                  </CollapsibleSection>
 
-              <CollapsibleSection
-                title="6. Produkty s nevyplněným TARIC kódem"
-                description="Prodejné produkty bez TARIC kódu — kód je povinný pro vývoz mimo EU a pro správné celní zařazení."
-                badge={s.sec6?.total ?? 0}
-                badgeColor="orange"
-              >
-                {s.sec6 && <Section6 data={s.sec6} date={report.date} />}
-              </CollapsibleSection>
+                  <CollapsibleSection
+                    title="7. Korekce zásob (posledních 7 dní)"
+                    description="Manuální korekce stavu skladových zásob — plusové i mínusové odchylky od evidovaného stavu."
+                    badge={s.sk_sec7?.total ?? 0}
+                    badgeColor="gray"
+                  >
+                    {s.sk_sec7 && <SkSec7 data={s.sk_sec7} date={report.date} />}
+                  </CollapsibleSection>
 
-              <CollapsibleSection
-                title="7. Dárek není skladem"
-                description="Produkt nastavený jako dárek k objednávce není momentálně skladem — zákazník dárek nedostane."
-                badge={s.sec7?.total ?? 0}
-                badgeColor="orange"
-              >
-                {s.sec7 && <Section7 data={s.sec7} date={report.date} />}
-              </CollapsibleSection>
+                  <CollapsibleSection
+                    title="8. Blokace pultů (posledních 10 dní)"
+                    description="Záznamy o blokacích skladových pultů — čím byly způsobeny a jak dlouho trvaly."
+                    badge={s.sk_sec8?.total ?? 0}
+                    badgeColor="red"
+                  >
+                    {s.sk_sec8 && <SkSec8 data={s.sk_sec8} date={report.date} />}
+                  </CollapsibleSection>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* KPI Chip Bar */}
+                <KpiChipBar chips={kpiChips} />
 
-              <CollapsibleSection
-                title="8. Nesoulad kategorizace — strom"
-                description="Stromová struktura kategorií se špatně přiřazenými produkty — produkty nesplňují pravidla kategorizace."
-                badge={s.sec8?.celkem_mimo ?? 0}
-                badgeColor="gray"
-              >
-                {s.sec8 && <Section8 data={s.sec8} date={report.date} />}
-              </CollapsibleSection>
+                {/* Sections — always rendered, green when empty */}
+                <div className="space-y-2">
+                  <CollapsibleSection
+                    title="1. Zapnutý produkt v doprodeji bez zásoby"
+                    description="Nabídka něčeho, co nejsme schopni dodat — produkt je aktivní v doprodeji, ale není k dispozici žádná zásoba."
+                    badge={s.sec1?.total ?? 0}
+                    badgeColor="orange"
+                  >
+                    {s.sec1 && <Section1 data={s.sec1} date={report.date} />}
+                  </CollapsibleSection>
 
-              <CollapsibleSection
-                title="9. Objednány k likvidaci"
-                description="Produkty s blížícím se termínem likvidace — je třeba je prodat nebo zajistit jejich vyřazení před vypršením lhůty."
-                badge={s.sec9?.terminy.length ?? 0}
-                badgeColor="purple"
-              >
-                {s.sec9 && <Section9 data={s.sec9} date={report.date} reportDate={report.date} />}
-              </CollapsibleSection>
+                  <CollapsibleSection
+                    title="2. Saleable bez dodavatelského skladu"
+                    description="Produkt je označen jako prodejný, ale není napojen na žádný dodavatelský sklad — nelze zajistit zásobování."
+                    badge={s.sec2?.total ?? 0}
+                    badgeColor="blue"
+                  >
+                    {s.sec2 && <Section2 data={s.sec2} date={report.date} />}
+                  </CollapsibleSection>
 
-              <CollapsibleSection
-                title="10. Produkty v limitu autoobjednání"
-                description="Produkty, které dosahují nebo přesahují nastavený limit pro automatické objednání — vyžadují kontrolu."
-                badge={s.sec10?.items.length ?? 0}
-                badgeColor="purple"
-              >
-                {s.sec10 && <Section10 data={s.sec10} date={report.date} reportDate={report.date} />}
-              </CollapsibleSection>
+                  <CollapsibleSection
+                    title="3. WithVariant s rozdílnou cenou"
+                    description="Variantní produkty mají nekonzistentní ceny — různé varianty téhož produktu se liší cenou, což může způsobit zobrazení špatné ceny."
+                    badge={s.sec3?.uniqueCount ?? 0}
+                    badgeColor="blue"
+                  >
+                    {s.sec3 && <Section3 data={s.sec3} date={report.date} />}
+                  </CollapsibleSection>
 
-              <CollapsibleSection
-                title="11. Mimo saleable"
-                description="Produkty, které jsou v systému aktivní, ale nesplňují podmínky pro zařazení do prodejního katalogu (saleable)."
-                badge={s.sec11?.celkem_produktu ?? s.sec11?.celkem ?? 0}
-                badgeColor="gray"
-              >
-                {s.sec11 && <Section11 data={s.sec11} date={report.date} />}
-              </CollapsibleSection>
+                  <CollapsibleSection
+                    title="4. Nelze doručit"
+                    description="Produkty, které nelze doručit — jsou aktivní, ale jejich konfigurace dopravy nebo dostupnost to neumožňuje."
+                    badge={kpi.sec4_count}
+                    badgeColor="red"
+                  >
+                    {s.sec4 && <Section4 data={s.sec4} date={report.date} />}
+                  </CollapsibleSection>
 
-              <CollapsibleSection
-                title="12. Nezadané rozměry"
-                description="Produkty bez vyplněných rozměrů — chybějící parametry znemožňují správný výpočet dopravy nebo zobrazení filtru."
-                badge={s.sec12?.celkem_produktu ?? 0}
-                badgeColor="gray"
-              >
-                {s.sec12 && <Section12 data={s.sec12} date={report.date} />}
-              </CollapsibleSection>
+                  <CollapsibleSection
+                    title="5. Produkty s TARIC kódem — nelze odeslat"
+                    description="Produkty mají vyplněný TARIC kód, ale z technických důvodů je nelze odeslat do zahraničí."
+                    badge={s.sec5?.total ?? 0}
+                    badgeColor="orange"
+                  >
+                    {s.sec5 && <Section5 data={s.sec5} date={report.date} />}
+                  </CollapsibleSection>
 
-              <CollapsibleSection
-                title="13. Saleable bez kategorie"
-                description="Prodejné produkty bez přiřazené kategorie — zákazník je nenajde v navigaci ani filtrech, jsou prakticky neviditelné."
-                badge={s.sec13?.total ?? s.sec13?.items.length ?? 0}
-                badgeColor="blue"
-              >
-                {s.sec13 && <Section13 data={s.sec13} date={report.date} />}
-              </CollapsibleSection>
+                  <CollapsibleSection
+                    title="6. Produkty s nevyplněným TARIC kódem"
+                    description="Prodejné produkty bez TARIC kódu — kód je povinný pro vývoz mimo EU a pro správné celní zařazení."
+                    badge={s.sec6?.total ?? 0}
+                    badgeColor="orange"
+                  >
+                    {s.sec6 && <Section6 data={s.sec6} date={report.date} />}
+                  </CollapsibleSection>
 
-              <CollapsibleSection
-                title="14. Záporná marže"
-                description="Produkty, jejichž prodejní cena je nižší než nákupní — každý prodej generuje přímou ztrátu."
-                badge={kpi.sec14_count}
-                badgeColor="red"
-              >
-                {s.sec14 && <Section14 data={s.sec14} date={report.date} />}
-              </CollapsibleSection>
+                  <CollapsibleSection
+                    title="7. Dárek není skladem"
+                    description="Produkt nastavený jako dárek k objednávce není momentálně skladem — zákazník dárek nedostane."
+                    badge={s.sec7?.total ?? 0}
+                    badgeColor="orange"
+                  >
+                    {s.sec7 && <Section7 data={s.sec7} date={report.date} />}
+                  </CollapsibleSection>
 
-              <CollapsibleSection
-                title="15. Nesoulad kategorizace"
-                description="Produkty zařazené do kategorií, které neodpovídají jejich skutečným atributům — vede k chybným filtrům a špatné zkušenosti zákazníka."
-                badge={s.sec15?.celkem_mimo ?? s.sec15?.kategorie.reduce((n, k) => n + k.produktu_mimo, 0) ?? 0}
-                badgeColor="gray"
-              >
-                {s.sec15 && <Section15 data={s.sec15} date={report.date} />}
-              </CollapsibleSection>
-            </div>
+                  <CollapsibleSection
+                    title="8. Nesoulad kategorizace — strom"
+                    description="Stromová struktura kategorií se špatně přiřazenými produkty — produkty nesplňují pravidla kategorizace."
+                    badge={s.sec8?.celkem_mimo ?? 0}
+                    badgeColor="gray"
+                  >
+                    {s.sec8 && <Section8 data={s.sec8} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="9. Objednány k likvidaci"
+                    description="Produkty s blížícím se termínem likvidace — je třeba je prodat nebo zajistit jejich vyřazení před vypršením lhůty."
+                    badge={s.sec9?.terminy.length ?? 0}
+                    badgeColor="purple"
+                  >
+                    {s.sec9 && <Section9 data={s.sec9} date={report.date} reportDate={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="10. Produkty v limitu autoobjednání"
+                    description="Produkty, které dosahují nebo přesahují nastavený limit pro automatické objednání — vyžadují kontrolu."
+                    badge={s.sec10?.items.length ?? 0}
+                    badgeColor="purple"
+                  >
+                    {s.sec10 && <Section10 data={s.sec10} date={report.date} reportDate={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="11. Mimo saleable"
+                    description="Produkty, které jsou v systému aktivní, ale nesplňují podmínky pro zařazení do prodejního katalogu (saleable)."
+                    badge={s.sec11?.celkem_produktu ?? s.sec11?.celkem ?? 0}
+                    badgeColor="gray"
+                  >
+                    {s.sec11 && <Section11 data={s.sec11} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="12. Nezadané rozměry"
+                    description="Produkty bez vyplněných rozměrů — chybějící parametry znemožňují správný výpočet dopravy nebo zobrazení filtru."
+                    badge={s.sec12?.celkem_produktu ?? 0}
+                    badgeColor="gray"
+                  >
+                    {s.sec12 && <Section12 data={s.sec12} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="13. Saleable bez kategorie"
+                    description="Prodejné produkty bez přiřazené kategorie — zákazník je nenajde v navigaci ani filtrech, jsou prakticky neviditelné."
+                    badge={s.sec13?.total ?? s.sec13?.items.length ?? 0}
+                    badgeColor="blue"
+                  >
+                    {s.sec13 && <Section13 data={s.sec13} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="14. Záporná marže"
+                    description="Produkty, jejichž prodejní cena je nižší než nákupní — každý prodej generuje přímou ztrátu."
+                    badge={kpi.sec14_count}
+                    badgeColor="red"
+                  >
+                    {s.sec14 && <Section14 data={s.sec14} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="15. Nesoulad kategorizace"
+                    description="Produkty zařazené do kategorií, které neodpovídají jejich skutečným atributům — vede k chybným filtrům a špatné zkušenosti zákazníka."
+                    badge={s.sec15?.celkem_mimo ?? s.sec15?.kategorie.reduce((n, k) => n + k.produktu_mimo, 0) ?? 0}
+                    badgeColor="gray"
+                  >
+                    {s.sec15 && <Section15 data={s.sec15} date={report.date} />}
+                  </CollapsibleSection>
+                </div>
+              </>
+            )}
           </div>
         </main>
         )}

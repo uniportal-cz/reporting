@@ -1,6 +1,7 @@
 import * as cheerio from 'cheerio'
 import type { CheerioAPI, Cheerio } from 'cheerio'
 import type { AnyNode, Element } from 'domhandler'
+import { parseSkladovyEmail } from '@/lib/parser-skladovy'
 import {
   Report,
   ReportSections,
@@ -1167,6 +1168,10 @@ function computeKPI(sections: ReportSections): ReportKPI {
 // ---------------------------------------------------------------------------
 
 export function parseReportEmail(html: string, date: string, fetchedAt: string, reportType = 'obchodni'): Report {
+  if (reportType === 'skladovy') {
+    return parseSkladovyEmail(html, date, fetchedAt)
+  }
+
   const $ = cheerio.load(html)
   const sections: ReportSections = {}
 
