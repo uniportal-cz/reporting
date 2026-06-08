@@ -33,67 +33,98 @@ The app reads HTML report emails from IMAP, parses them into structured JSON, pe
 
 ```
 IMAP inbox
-  → lib/imap.ts          (ImapFlow + mailparser — fetches/lists emails)
-  → lib/parser.ts        (Cheerio HTML parser — extracts structured sections)
-  → lib/storage.ts       (dual backend: Vercel Blob when BLOB_READ_WRITE_TOKEN set, else ./data/)
-  → app/dashboard/       (server component loads from storage, passes to client)
+  → lib/imap.ts            (ImapFlow + mailparser — fetches/lists emails)
+  → lib/parser.ts          (dispatch entry point — routes to per-type parser)
+      → lib/parser.ts           (obchodní: Cheerio HTML, sec1–sec15)
+      → lib/parser-skladovy.ts  (skladový: plain-text line-by-line, sk_sec1–sk_sec8)
+      → lib/parser-ucetni.ts    (účetní: plain-text line-by-line, uc_sec1–uc_sec4)
+  → lib/storage.ts         (dual backend: Vercel Blob / ./data/)
+  → app/dashboard/         (server component loads from storage, passes to client)
 ```
-
-### Storage backend switching
-
-`lib/storage.ts` checks `BLOB_READ_WRITE_TOKEN` at runtime. Vercel Blob uses `access: 'private'` and `allowOverwrite: true`. Local dev writes to `./data/reports/<date>.json` with an index at `./data/index.json`. On Vercel without the token, `/tmp` is used (ephemeral — lost on cold start).
 
 ### Report types
 
-`lib/report-types.ts` defines `REPORT_TYPES`. Each type has:
-- `subjectKeyword` — ASCII-safe string for IMAP server-side `SEARCH SUBJECT` (fast, approximate)
-- `matchSubject` — client-side function for precise filtering after IMAP results
+`lib/report-types.ts` defines `REPORT_TYPES` (currently three: `obchodni`, `skladovy`, `ucetni`). Each type has:
+- `subjectKeyword` — ASCII-safe string for IMAP server-side `SEARCH SUBJECT`
+- `matchSubject` — client-side precise filter applied after IMAP results
 
-When adding a new report type, add it to `REPORT_TYPES` and add the corresponding section interfaces to `types/report.ts`, section components under `components/sections/`, and wire them into `DashboardClient.tsx`.
+The tab bar in the dashboard header iterates `REPORT_TYPES` automatically — adding a type there is sufficient for the tab to appear.
+
+**Adding a new report type checklist:**
+1. Add entry to `REPORT_TYPES` in `lib/report-types.ts`
+2. Add section interfaces to `types/report.ts`, extend `ReportKPI` and `ReportSections` with optional fields (prefixed to avoid collision)
+3. Create `lib/parser-<type>.ts` with a `parse<Type>Email(html, date, fetchedAt): Report` function
+4. Add dispatch in `lib/parser.ts` `parseReportEmail`
+5. Create section components under `components/sections/` (lazy-loaded)
+6. Add a `kpiChips<Type>` array and a conditional render block in `DashboardClient.tsx`
+
+### Parsers
+
+**`lib/parser.ts`** (obchodní) — Cheerio HTML parser. Uses `findHeading($, patterns)` to locate section headings (`h1–h5, strong, b, td[colspan], th`), then `collectSectionContent` to gather sibling elements, then `findTable` / `findBulletLines` to extract data. Each `parseSection*` function is wrapped in try/catch so failures are isolated.
+
+**`lib/parser-skladovy.ts`** (skladový) — plain-text email. Sections are separated by `## ` Markdown headings (or short lines matching known patterns). Extracts lines from HTML via cheerio (replaces `<br>` with `\n`, converts tables to pipe-separated lines), then runs a state-machine through the line list.
+
+**`lib/parser-ucetni.ts`** (účetní) — plain-text email. No `## ` headings; sections detected by content patterns (`/^celkem přijatých faktur:/i` etc.). A two-pass split first divides lines into named chunks, then each chunk is parsed individually. Block 3 contains two sub-sections (nevykryté / nadměrně vykryté) detected within the same chunk.
+
+**Parser debugging workflow:**
+1. `npx tsx scripts/save-email-html.ts [UID]` → saves raw HTML to `data/debug-email.html`
+2. Inspect headings/content in browser
+3. Update patterns in the relevant parser
+4. `npx tsx scripts/test-sections.ts` to verify
+
+### Storage
+
+`lib/storage.ts` checks `BLOB_READ_WRITE_TOKEN` at runtime:
+- Set → Vercel Blob (`access: 'private'`, `allowOverwrite: true`)
+- Local dev → `./data/reports/<date>.json` with index at `./data/index.json`
+- Vercel without token → `/tmp` (ephemeral, lost on cold start)
 
 ### API routes
 
-All routes use `runtime = 'nodejs'` (required for `imapflow` / `mailparser` which use Node.js native APIs — they are listed in `serverComponentsExternalPackages` in `next.config.js`).
+All routes use `runtime = 'nodejs'` (required for `imapflow`/`mailparser`).
 
-- `POST /api/fetch-report` — accepts `{ uid, reportType }`, fetches email from IMAP by UID, parses it, saves to storage, returns the full `Report` object. The client displays from the response directly (no DB round-trip).
-- `GET /api/emails?type=X` — lists last 10 matching emails from IMAP (envelope only, no body download).
+- `POST /api/fetch-report` — `{ uid, reportType }` → fetches from IMAP, parses, saves, returns full `Report`. Client displays directly from response (no DB round-trip).
+- `GET /api/emails?type=X` — lists last 10 matching emails (envelope only, no body).
 - `GET /api/reports/[date]` — loads a saved report from storage.
-- `GET /api/reports/[date]/export?section=N` — CSV export for a section (sections 1–15 supported).
-- `GET /api/debug/storage` — storage health check with write/read round-trip.
-- `GET /api/debug/parse?uid=XXX` — fetches email HTML and returns headings/tables for parser debugging.
-
-### Parser
-
-`lib/parser.ts` uses Cheerio to parse the email HTML heuristically. It searches for section headings by regex patterns, then extracts the nearest table. Each section is wrapped in its own try/catch so a parse failure in one section doesn't break others.
-
-Currently parsed sections: 1–6, 7, 8, 9, 10, 11, 12, 13, 14, 15. Sections 5, 6, 8, 10 are newer and may not appear in all email types.
-
-**Parser debugging workflow:**
-1. Run `npx tsx scripts/save-email-html.ts [UID]` to save the raw HTML
-2. Open `data/debug-email.html` in a browser and inspect `<h2>` heading text
-3. Update heading patterns in the relevant `parseSection*` function
-4. Verify with `npx tsx scripts/test-sections.ts`
-
-Key helpers in `lib/parser.ts`:
-- `findHeading($, patterns)` — searches `h1–h5, strong, b, td[colspan], th` by string or regex
-- `collectSectionContent($, heading)` — collects sibling elements after heading until next heading of same/higher level
-- `findBulletLines` / `findTable` / `findTables` — extract data from collected content
+- `GET /api/reports/[date]/export?section=N` — CSV export (obchodní sections 1–15).
+- `GET /api/debug/storage` — storage health check (write/read round-trip).
+- `GET /api/debug/parse?uid=XXX` — fetches email and returns headings/tables for parser debugging.
 
 ### Client architecture
 
 `DashboardClient.tsx` owns all interaction state:
-- `liveReport` — set from POST response immediately, avoiding a DB round-trip after loading
-- `selectedEmail` / `fetching` / `fetchError` — drives the three main-area states (report / ready-to-load card / loading animation)
-- `storedEmailUid` — UID of the email for the currently-viewed stored report; enables the "Znovu stáhnout" re-fetch button in the report header
+- `liveReport` — set from POST response to avoid a DB round-trip after fetching
+- `selectedEmail` / `fetching` / `fetchError` — drives the three main-area states
+- `storedEmailUid` — UID for the currently-viewed stored report; enables "Znovu stáhnout"
 
-**Email navigation logic:** clicking a "v DB" email in the sidebar navigates directly to the stored report (`router.push`) — no load card shown. Clicking an email not yet in storage shows the fetch card. The "Znovu stáhnout" button in the report header allows forced re-fetch/re-parse from IMAP for already-stored reports.
+**Email navigation:** clicking a "v DB" email navigates directly via `router.push` (no load card). Clicking an unsaved email shows the fetch card. "Znovu stáhnout" forces re-fetch/re-parse.
 
-`EmailBrowser.tsx` is a pure listing component — it emits `onEmailClick` and receives `selectedUid` / `loadedUids` from the parent. It has no fetching logic.
+**Per-type rendering:** the main content area branches on `activeType`:
+```
+activeType === 'ucetni'   → KpiChipsUcetni   + UcSec1–4 collapsibles
+activeType === 'skladovy' → KpiChipsSkladovy + SkSec1–8 collapsibles
+default (obchodni)        → KpiChips         + Section1–15 collapsibles
+```
+Each report type has its own `kpiChips*` array (defined inline in `DashboardClient`) and KPI fields prefixed in `ReportKPI` (`sk_*`, `uc_*`). Delta indicators are green when value decreases (lower = better for all current types).
 
-Section components (`components/sections/Section*.tsx`) are lazy-loaded and only rendered when the collapsible is opened. Each section is always rendered in `DashboardClient` — empty sections show a green "V pořádku" state instead of being hidden. Section components use two shared hooks: `useTableFilter` (text search over a list of objects by specified keys) and `useTableSort` (column sort with Czech locale collation). `StatBars` renders a horizontal bar chart from a `Record<string, number>` — pass `title` (not `label`).
+**Shared section utilities:**
+- `useTableFilter` — text search over a list of objects by specified keys
+- `useTableSort` — column sort with Czech locale collation
+- `StatBars` — horizontal bar chart from `Record<string, number>`; pass `title` prop (not `label`)
+- `CollapsibleSection` — wrapper with badge and green "V pořádku" empty state; badge = 0 renders green
 
-The dashboard header shows a scrollable 15-chip KPI bar (one chip per section) with delta indicators vs. the previous report of the same type.
+`EmailBrowser.tsx` is a pure listing component — emits `onEmailClick`, receives `selectedUid`/`loadedUids`. No fetching logic.
 
 ### Compare page
 
-`/dashboard/compare` loads up to 30 index entries and selected report JSONs server-side, passes them to `CompareClient.tsx`. The compare view shows a KPI delta table and product presence matrices for sec1/sec13/sec14.
+`/dashboard/compare` loads up to 30 index entries and selected report JSONs server-side, passes them to `CompareClient.tsx`. Shows a KPI delta table and product presence matrices for sec1/sec13/sec14 (obchodní only).
+
+### Section component naming
+
+| Report | Prefix | Files |
+|--------|--------|-------|
+| Obchodní | `Section` | `Section1.tsx` – `Section15.tsx` |
+| Skladový | `SkSec` | `SkSec1.tsx` – `SkSec8.tsx` |
+| Účetní | `UcSec` | `UcSec1.tsx` – `UcSec4.tsx` |
+
+All section components receive `data` (typed section) and `date` (report date `YYYY-MM-DD`) props. Some obchodní sections also accept `reportDate` (same value, kept for legacy reasons).
