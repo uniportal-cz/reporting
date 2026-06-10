@@ -3,6 +3,7 @@ import type { CheerioAPI, Cheerio } from 'cheerio'
 import type { AnyNode, Element } from 'domhandler'
 import { parseSkladovyEmail } from '@/lib/parser-skladovy'
 import { parseUcetniEmail } from '@/lib/parser-ucetni'
+import { parseMasterdataEmail } from '@/lib/parser-masterdata'
 import {
   Report,
   ReportSections,
@@ -1171,6 +1172,7 @@ function computeKPI(sections: ReportSections): ReportKPI {
 export function parseReportEmail(html: string, date: string, fetchedAt: string, reportType = 'obchodni'): Report {
   if (reportType === 'skladovy') return parseSkladovyEmail(html, date, fetchedAt)
   if (reportType === 'ucetni') return parseUcetniEmail(html, date, fetchedAt)
+  if (reportType === 'masterdata') return parseMasterdataEmail(html, date, fetchedAt)
 
   const $ = cheerio.load(html)
   const sections: ReportSections = {}

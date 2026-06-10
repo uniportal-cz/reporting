@@ -41,6 +41,20 @@ const UcSec2 = lazy(() => import('./sections/UcSec2'))
 const UcSec3 = lazy(() => import('./sections/UcSec3'))
 const UcSec4 = lazy(() => import('./sections/UcSec4'))
 
+// MasterData sections
+const MdSec1 = lazy(() => import('./sections/MdSec1'))
+const MdSec2 = lazy(() => import('./sections/MdSec2'))
+const MdSec3 = lazy(() => import('./sections/MdSec3'))
+const MdSec4 = lazy(() => import('./sections/MdSec4'))
+const MdSec5 = lazy(() => import('./sections/MdSec5'))
+const MdSec6 = lazy(() => import('./sections/MdSec6'))
+const MdSec7 = lazy(() => import('./sections/MdSec7'))
+const MdSec8 = lazy(() => import('./sections/MdSec8'))
+const MdSec9 = lazy(() => import('./sections/MdSec9'))
+const MdSec10 = lazy(() => import('./sections/MdSec10'))
+const MdSec11 = lazy(() => import('./sections/MdSec11'))
+const MdSec12 = lazy(() => import('./sections/MdSec12'))
+
 // ─── KPI Chip Bar ────────────────────────────────────────────────────────────
 
 interface KpiChip {
@@ -244,6 +258,22 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
     { id: 'sk8', label: '8 Blokace pultů', value: kpi.sk_sec8_count, prev: prevKpi?.sk_sec8_count, color: 'red' },
   ]
 
+  const kpiChipsMasterdata: KpiChip[] = [
+    { id: 'md1', label: '1 Chybné ext. masky', value: kpi.md_sec1_errors, prev: prevKpi?.md_sec1_errors, color: 'red' },
+    { id: 'md2', label: '2 Variant. vlast.', value: kpi.md_sec2_count, prev: prevKpi?.md_sec2_count, color: 'orange' },
+    { id: 'md3', label: '3 Nepouž. názvy', value: kpi.md_sec3_count, prev: prevKpi?.md_sec3_count, color: 'orange' },
+    { id: 'md4', label: '4 MDM úkoly', value: kpi.md_sec4_count, prev: prevKpi?.md_sec4_count, color: 'blue' },
+    { id: 'md5', label: '5 Kvalita dat', value: kpi.md_sec5_count, prev: prevKpi?.md_sec5_count, color: 'purple' },
+    { id: 'md6', label: '6 Kategorie', value: kpi.md_sec6_count, prev: prevKpi?.md_sec6_count, color: 'gray' },
+    { id: 'md7', label: '7 Prod. období', value: kpi.md_sec7_count, prev: prevKpi?.md_sec7_count, color: 'orange' },
+    { id: 'md8', label: '8 Bez text. vzorce', value: kpi.md_sec8_count, prev: prevKpi?.md_sec8_count, color: 'orange' },
+    { id: 'md9', label: '9 Bez ext. masky', value: kpi.md_sec9_count, prev: prevKpi?.md_sec9_count, color: 'red' },
+    { id: 'md10', label: '10 Chyb. zást. texty', value: kpi.md_sec10_count, prev: prevKpi?.md_sec10_count, color: 'orange' },
+    { id: 'md10b', label: '10b Nepřeložené', value: kpi.md_sec10b_count, prev: prevKpi?.md_sec10b_count, color: 'orange' },
+    { id: 'md11', label: '11 Chybí název cs', value: kpi.md_sec11_count, prev: prevKpi?.md_sec11_count, color: 'red' },
+    { id: 'md12', label: '12 Saleable bez kat.', value: kpi.md_sec12_count, prev: prevKpi?.md_sec12_count, color: 'blue' },
+  ]
+
   const kpiChipsUcetni: KpiChip[] = [
     { id: 'uc1', label: '1 Nedoručeno', value: kpi.uc_sec1_count, prev: prevKpi?.uc_sec1_count, color: 'orange' },
     { id: 'uc2', label: '2 Faktury', value: kpi.uc_sec2_count, prev: prevKpi?.uc_sec2_count, color: 'blue' },
@@ -407,7 +437,120 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
           </div>
 
           <div className="px-6 py-5 space-y-4">
-            {activeType === 'ucetni' ? (
+            {activeType === 'masterdata' ? (
+              <>
+                <KpiChipBar chips={kpiChipsMasterdata} />
+                <div className="space-y-2">
+                  <CollapsibleSection
+                    title="1. Neodpovídající produkty externím maskám"
+                    description="Produkty, které nesplňují požadavky externích masek pro jednotlivé prodejní kanály."
+                    badge={s.md_sec1?.chybovych_total ?? 0}
+                    badgeColor="red"
+                  >
+                    {s.md_sec1 && <MdSec1 data={s.md_sec1} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="2. Neodpovídající produkty masce variantních vlastností"
+                    description="Produkty s neplatnou hodnotou variantní vlastnosti — hodnota není v povolené množině masky."
+                    badge={s.md_sec2?.total ?? 0}
+                    badgeColor="orange"
+                  >
+                    {s.md_sec2 && <MdSec2 data={s.md_sec2} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="3. Unifikované názvy — NEPOUŽÍVANÉ"
+                    description="Unifikované názvy, ke kterým jsou přiřazeny produkty, ale samotné názvy jsou nepoužívané nebo označené NEPOUŽÍVAT."
+                    badge={s.md_sec3?.total ?? 0}
+                    badgeColor="orange"
+                  >
+                    {s.md_sec3 && <MdSec3 data={s.md_sec3} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="4. MDM workflow — otevřené úkoly"
+                    description="Přehled otevřených MDM úkolů dle řešitele a typu — sumarizační matice a seznam úkolů k řešení."
+                    badge={s.md_sec4?.total ?? 0}
+                    badgeColor="blue"
+                  >
+                    {s.md_sec4 && <MdSec4 data={s.md_sec4} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="5. Nesplnění kvality dat"
+                    description="Unifikované názvy, které nesplňují podmínky kvality dat pro přiřazenou šablonu."
+                    badge={s.md_sec5?.total ?? 0}
+                    badgeColor="purple"
+                  >
+                    {s.md_sec5 && <MdSec5 data={s.md_sec5} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="6. Kategorie s problémem"
+                    description="Kategorie blokující produkty (vypnuto + produkty > 0) nebo prázdné aktivní terminální kategorie."
+                    badge={s.md_sec6?.total ?? 0}
+                    badgeColor="gray"
+                  >
+                    {s.md_sec6 && <MdSec6 data={s.md_sec6} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="7. Nezadané prodejní období unifikovaného názvu"
+                    description="Unifikované názvy bez nastaveného prodejního období — produkty mohou být nabízeny mimo sezónu."
+                    badge={s.md_sec7?.total ?? 0}
+                    badgeColor="orange"
+                  >
+                    {s.md_sec7 && <MdSec7 data={s.md_sec7} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="8. Kombinace bez textového vzorce"
+                    description="Kombinace šablona + unif. název, pro které není nastaven textový vzorec pro generování popisků."
+                    badge={s.md_sec8?.total ?? 0}
+                    badgeColor="orange"
+                  >
+                    {s.md_sec8 && <MdSec8 data={s.md_sec8} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="9. Kombinace bez externí masky"
+                    description="Kombinace šablona + unif. název, pro které není přiřazena žádná externí maska pro prodejní kanály."
+                    badge={s.md_sec9?.total ?? 0}
+                    badgeColor="red"
+                  >
+                    {s.md_sec9 && <MdSec9 data={s.md_sec9} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="10. Zástupné texty vlastností — nevyplněno / nepřeloženo"
+                    description="Vlastnosti bez vyplněných zástupných textů (enum kandidáti) nebo nepřeložené do vybraných jazyků."
+                    badge={(s.md_sec10?.nevyplnene_total ?? 0) + (s.md_sec10?.neprelozene_total ?? 0)}
+                    badgeColor="orange"
+                  >
+                    {s.md_sec10 && <MdSec10 data={s.md_sec10} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="11. Produkty s nevygenerovaným názvem"
+                    description="Produkty, pro které nebyl vygenerován název v daném jazyku — produkt není správně lokalizován."
+                    badge={s.md_sec11?.cs_count ?? 0}
+                    badgeColor="red"
+                  >
+                    {s.md_sec11 && <MdSec11 data={s.md_sec11} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="12. Produkty 'saleable' bez kategorie"
+                    description="Prodejné produkty, které nemají přiřazenou kategorii — zákazník je nenajde v navigaci ani filtrech."
+                    badge={s.md_sec12?.total ?? 0}
+                    badgeColor="blue"
+                  >
+                    {s.md_sec12 && <MdSec12 data={s.md_sec12} date={report.date} />}
+                  </CollapsibleSection>
+                </div>
+              </>
+            ) : activeType === 'ucetni' ? (
               <>
                 <KpiChipBar chips={kpiChipsUcetni} />
                 <div className="space-y-2">

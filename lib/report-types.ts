@@ -35,6 +35,14 @@ export const REPORT_TYPES: ReportTypeConfig[] = [
       return (s.includes('účetní report') || s.includes('ucetni report')) && s.includes('nákupní')
     },
   },
+  {
+    id: 'masterdata',
+    label: 'MasterData',
+    subjectKeyword: 'MasterData report',
+    matchSubject: (subject: string) => {
+      return subject.toLowerCase().includes('masterdata report')
+    },
+  },
 ]
 
 export const DEFAULT_REPORT_TYPE = 'obchodni'

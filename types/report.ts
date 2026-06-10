@@ -37,6 +37,20 @@ export interface ReportKPI {
   uc_sec3b_count?: number  // Nevykryto ks
   uc_sec3c_count?: number  // Nadměrně vykryté příjemky
   uc_sec4_count?: number   // Zásoby přes limit
+  // MasterData report KPI fields
+  md_sec1_errors?: number   // Chybné ext. masky (součet chybových)
+  md_sec2_count?: number    // Chybné variantní vlastnosti (produkty)
+  md_sec3_count?: number    // Nepoužívané unif. názvy
+  md_sec4_count?: number    // MDM úkoly (otevřené)
+  md_sec5_count?: number    // Nesplnění kvality dat
+  md_sec6_count?: number    // Kategorie
+  md_sec7_count?: number    // Chybějící prodejní období
+  md_sec8_count?: number    // Bez textového vzorce
+  md_sec9_count?: number    // Bez ext. masky
+  md_sec10_count?: number   // Chybějící zást. texty (nevyplněné)
+  md_sec10b_count?: number  // Nepřeložené zást. texty
+  md_sec11_count?: number   // Chybějící název (cs)
+  md_sec12_count?: number   // Saleable bez kategorie
 }
 
 export interface Report {
@@ -77,6 +91,19 @@ export interface ReportSections {
   uc_sec2?: UcSec2
   uc_sec3?: UcSec3
   uc_sec4?: UcSec4
+  // MasterData report sections
+  md_sec1?: MdSec1
+  md_sec2?: MdSec2
+  md_sec3?: MdSec3
+  md_sec4?: MdSec4
+  md_sec5?: MdSec5
+  md_sec6?: MdSec6
+  md_sec7?: MdSec7
+  md_sec8?: MdSec8
+  md_sec9?: MdSec9
+  md_sec10?: MdSec10
+  md_sec11?: MdSec11
+  md_sec12?: MdSec12
 }
 
 // Sec 1: Zapnutý v doprodeji bez zásoby
@@ -346,6 +373,199 @@ export interface UcSec3 {
 }
 
 export type UcSec4 = Section10
+
+// ─── MasterData report section types ─────────────────────────────────────────
+
+// MdSec1: Neodpovídající produkty externím maskám
+export interface MdSec1MaskItem {
+  sablona: string
+  sablona_url?: string
+  nazev_masky: string
+  typ_produktu: string
+  vlastnosti: string[]
+  ok: number
+  chybovych: number
+}
+export interface MdSec1Kanal {
+  kanal: string
+  chybovych_total: number
+  ok_total: number
+  masky: MdSec1MaskItem[]
+}
+export interface MdSec1 {
+  chybovych_total: number
+  ok_total: number
+  kanaly: MdSec1Kanal[]
+}
+
+// MdSec2: Neodpovídající produkty masce variantních vlastností
+export interface MdSec2Item {
+  id: string
+  id_url?: string
+  nazev: string
+  typ: string
+  vlastnost: string
+  hodnoty: string[]
+}
+export interface MdSec2 {
+  total: number
+  items: MdSec2Item[]
+  stats: { byTyp: Record<string, number>; byVlastnost: Record<string, number> }
+}
+
+// MdSec3: Unifikované názvy - NEPOUŽÍVANÉ
+export interface MdSec3Item {
+  nazev: string
+  pocet: number
+}
+export interface MdSec3 {
+  total: number
+  items: MdSec3Item[]
+}
+
+// MdSec4: MDM workflow
+export interface MdSec4SumarizaceRow {
+  resitel: string
+  sablona: number
+  vlastnost: number
+  modelova_rada: number
+  znacka: number
+  externi_maska: number
+  textovy_vzorec: number
+  technologie: number
+  zastupny_text: number
+  celkem: number
+}
+export interface MdSec4UkolItem {
+  id: string
+  id_url?: string
+  resitel: string
+  typ: string
+  entita: string
+  entita_url?: string
+  zadavatel: string
+  termin: string   // ISO date YYYY-MM-DD
+  stav: 'todo' | 'inprogress' | string
+}
+export interface MdSec4 {
+  total: number
+  sumarizace: MdSec4SumarizaceRow[]
+  ukoly: MdSec4UkolItem[]
+}
+
+// MdSec5: Nesplnění kvality dat
+export interface MdSec5SablonaItem {
+  sablona: string
+  sablona_url?: string
+  nazvy: string[]
+}
+export interface MdSec5 {
+  total: number
+  sablony: MdSec5SablonaItem[]
+}
+
+// MdSec6: Kategorie
+export interface MdSec6KategorieItem {
+  nazev: string
+  url?: string
+  typ: 'koncova' | 'nekoncova' | string
+  stav: 'zapnuto' | 'vypnuto' | string
+  splnuji: number
+  celkem: number
+}
+export interface MdSec6Strom {
+  nazev: string
+  url?: string
+  kategorie: MdSec6KategorieItem[]
+}
+export interface MdSec6 {
+  total: number
+  stromy: MdSec6Strom[]
+}
+
+// MdSec7: Nezadané prodejní období
+export interface MdSec7NazevItem {
+  nazev: string
+  obdobi: string[]
+}
+export interface MdSec7OsobaGroup {
+  osoba: string
+  pocet: number
+  nazvy: MdSec7NazevItem[]
+}
+export interface MdSec7 {
+  total: number
+  osoby: MdSec7OsobaGroup[]
+}
+
+// MdSec8: Kombinace bez textového vzorce
+export interface MdSec8Item {
+  sablona: string
+  unif_nazev: string
+  pocet: number
+}
+export interface MdSec8 {
+  total: number
+  items: MdSec8Item[]
+  stats: { bySablona: Record<string, number> }
+}
+
+// MdSec9: Kombinace bez externí masky (same shape as MdSec8)
+export type MdSec9 = MdSec8
+
+// MdSec10: Zástupné texty vlastností nevyplněno
+export interface MdSec10NevyplneneItem {
+  sablona: string
+  sablona_url?: string
+  unif_nazev: string
+  vlastnost: string
+  hodnoty: string[]
+}
+export interface MdSec10NeprelozeneItem {
+  sablona: string
+  sablona_url?: string
+  vlastnost: string
+  jazyky: string[]
+}
+export interface MdSec10 {
+  nevyplnene_total: number
+  neprelozene_total: number
+  nevyplnene: MdSec10NevyplneneItem[]
+  neprelozene: MdSec10NeprelozeneItem[]
+}
+
+// MdSec11: Produkty s nevygenerovaným názvem
+export interface MdSec11ProductItem {
+  id: string
+  id_url?: string
+  nazev: string
+  stav: 'saleable' | 'unsaleable' | string
+  skupina_id: string
+  skupina_nazev: string
+}
+export interface MdSec11JazykGroup {
+  jazyk: string
+  total: number
+  produkty: MdSec11ProductItem[]
+}
+export interface MdSec11 {
+  cs_count: number
+  jazyky: MdSec11JazykGroup[]
+}
+
+// MdSec12: Produkty "saleable" bez kategorie
+export interface MdSec12Item {
+  id: string
+  id_url?: string
+  nazev: string
+  stav: string
+  skupina_id: string
+  skupina_nazev: string
+}
+export interface MdSec12 {
+  total: number
+  items: MdSec12Item[]
+}
 
 // Sec 15: Nesoulad kategorizace
 export interface Section15Kategorie {
