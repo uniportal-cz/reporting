@@ -51,6 +51,14 @@ export interface ReportKPI {
   md_sec10b_count?: number  // Nepřeložené zást. texty
   md_sec11_count?: number   // Chybějící název (cs)
   md_sec12_count?: number   // Saleable bez kategorie
+  // Localization (Lokalizace) report KPI fields
+  lc_sec1_count?: number    // MDM úkoly (otevřené)
+  lc_sec2_count?: number    // Nedokončené překlady (součet)
+  lc_sec3_unfilled?: number // DPH chybí (součet unFilled)
+  lc_sec4_pct?: number      // Texty % pokrytí (0–100)
+  lc_sec5_count?: number    // Chybějící překlady (nonzero combos)
+  lc_sec6_count?: number    // Thule (celkový součet)
+  lc_sec7_count?: number    // Šablony bez vzorce
 }
 
 export interface Report {
@@ -91,6 +99,14 @@ export interface ReportSections {
   uc_sec2?: UcSec2
   uc_sec3?: UcSec3
   uc_sec4?: UcSec4
+  // Localization report sections
+  lc_sec1?: LcSec1
+  lc_sec2?: LcSec2
+  lc_sec3?: LcSec3
+  lc_sec4?: LcSec4
+  lc_sec5?: LcSec5
+  lc_sec6?: LcSec6
+  lc_sec7?: LcSec7
   // MasterData report sections
   md_sec1?: MdSec1
   md_sec2?: MdSec2
@@ -565,6 +581,99 @@ export interface MdSec12Item {
 export interface MdSec12 {
   total: number
   items: MdSec12Item[]
+}
+
+// ─── Localization report section types ───────────────────────────────────────
+
+// LcSec1: MDM workflow — same shape as MdSec4
+export type LcSec1 = MdSec4
+
+// LcSec2: TASK MANAGER — nedokončené překlady
+export interface LcSec2 {
+  total: number
+  languages: Record<string, number>   // {IT: 5836, SK: 6044, …}
+}
+
+// LcSec3: DPH vyplněnost sazeb
+export interface LcSec3Country {
+  filled: number
+  unFilled: number
+}
+export interface LcSec3 {
+  generatedAt?: string
+  total_unfilled: number
+  countries: Record<string, LcSec3Country>  // ISO alpha-3 codes
+}
+
+// LcSec4: TEXTY přehled generování
+export interface LcSec4TextValues {
+  generated: number
+  missing: number
+  manual: number
+  machine: number
+  api: number
+}
+export interface LcSec4Category {
+  id: string           // e.g. "01|hokej"
+  person: string
+  languages: Record<string, LcSec4TextValues>
+}
+export interface LcSec4Subsection {
+  categories: LcSec4Category[]
+  languageOrder: string[]
+}
+export interface LcSec4 {
+  generatedAt?: string
+  languageOrder: string[]
+  subsections: {
+    nazev: LcSec4Subsection
+    kratkypopis: LcSec4Subsection
+    detailnipopis: LcSec4Subsection
+  }
+}
+
+// LcSec5: PŘEKLADY — nevyplněné hodnoty
+export interface LcSec5 {
+  generatedAt?: string
+  languages: string[]
+  rows: Record<string, Record<string, number>>   // entityType → {CS: 0, DA: 5, …}
+  nonzero_combos: number
+}
+
+// LcSec6: Thule generátor
+export interface LcSec6Item {
+  languages: string[]
+  type: string
+  name: string
+  url?: string
+}
+export interface LcSec6Subsection {
+  total: number
+  items: LcSec6Item[]
+}
+export interface LcSec6 {
+  generatedAt?: string
+  total: number
+  subsections: {
+    unifikovanyNazev: LcSec6Subsection
+    nazevAuta: LcSec6Subsection
+    konfigurace: LcSec6Subsection
+    thuleSloupec: LcSec6Subsection
+    vlastnost: LcSec6Subsection
+  }
+}
+
+// LcSec7: Šablony s nevyplněným vzorcem pro název
+export interface LcSec7Item {
+  name: string
+  url?: string
+  languages: string[]
+  isUnused: boolean
+}
+export interface LcSec7 {
+  total: number
+  items: LcSec7Item[]
+  has_more: boolean
 }
 
 // Sec 15: Nesoulad kategorizace

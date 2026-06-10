@@ -55,6 +55,14 @@ const MdSec10 = lazy(() => import('./sections/MdSec10'))
 const MdSec11 = lazy(() => import('./sections/MdSec11'))
 const MdSec12 = lazy(() => import('./sections/MdSec12'))
 
+const LcSec1 = lazy(() => import('./sections/LcSec1'))
+const LcSec2 = lazy(() => import('./sections/LcSec2'))
+const LcSec3 = lazy(() => import('./sections/LcSec3'))
+const LcSec4 = lazy(() => import('./sections/LcSec4'))
+const LcSec5 = lazy(() => import('./sections/LcSec5'))
+const LcSec6 = lazy(() => import('./sections/LcSec6'))
+const LcSec7 = lazy(() => import('./sections/LcSec7'))
+
 // ─── KPI Chip Bar ────────────────────────────────────────────────────────────
 
 interface KpiChip {
@@ -272,6 +280,16 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
     { id: 'md10b', label: '10b Nepřeložené', value: kpi.md_sec10b_count, prev: prevKpi?.md_sec10b_count, color: 'orange' },
     { id: 'md11', label: '11 Chybí název cs', value: kpi.md_sec11_count, prev: prevKpi?.md_sec11_count, color: 'red' },
     { id: 'md12', label: '12 Saleable bez kat.', value: kpi.md_sec12_count, prev: prevKpi?.md_sec12_count, color: 'blue' },
+  ]
+
+  const kpiChipsLocalization: KpiChip[] = [
+    { id: 'lc1', label: '1 MDM úkoly', value: kpi.lc_sec1_count, prev: prevKpi?.lc_sec1_count, color: 'blue' },
+    { id: 'lc2', label: '2 Nedokončeno', value: kpi.lc_sec2_count, prev: prevKpi?.lc_sec2_count, color: 'red' },
+    { id: 'lc3', label: '3 DPH chybí', value: kpi.lc_sec3_unfilled, prev: prevKpi?.lc_sec3_unfilled, color: 'orange' },
+    { id: 'lc4', label: '4 TEXTY %', value: kpi.lc_sec4_pct, prev: prevKpi?.lc_sec4_pct, color: 'gray' },
+    { id: 'lc5', label: '5 Chyb. překlady', value: kpi.lc_sec5_count, prev: prevKpi?.lc_sec5_count, color: 'orange' },
+    { id: 'lc6', label: '6 Thule', value: kpi.lc_sec6_count, prev: prevKpi?.lc_sec6_count, color: 'purple' },
+    { id: 'lc7', label: '7 Bez vzorce', value: kpi.lc_sec7_count, prev: prevKpi?.lc_sec7_count, color: 'orange' },
   ]
 
   const kpiChipsUcetni: KpiChip[] = [
@@ -547,6 +565,74 @@ export default function DashboardClient({ report: serverReport, index, activeTyp
                     badgeColor="blue"
                   >
                     {s.md_sec12 && <MdSec12 data={s.md_sec12} date={report.date} />}
+                  </CollapsibleSection>
+                </div>
+              </>
+            ) : activeType === 'localization' ? (
+              <>
+                <KpiChipBar chips={kpiChipsLocalization} />
+                <div className="space-y-2">
+                  <CollapsibleSection
+                    title="1. MDM workflow — otevřené úkoly"
+                    description="Přehled otevřených úkolů v MDM workflow s rozdělením dle řešitele a typu entity."
+                    badge={s.lc_sec1?.total ?? 0}
+                    badgeColor="blue"
+                  >
+                    {s.lc_sec1 && <LcSec1 data={s.lc_sec1} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="2. TASK MANAGER — nedokončené překlady"
+                    description="Počty nedokončených překladatelských úkolů v task manageru dle jazyků."
+                    badge={s.lc_sec2?.total ?? 0}
+                    badgeColor="red"
+                  >
+                    {s.lc_sec2 && <LcSec2 data={s.lc_sec2} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="3. DPH vyplněnost sazeb"
+                    description="Přehled vyplněnosti DPH sazeb dle zemí — chybějící sazby mohou způsobit problémy při prodeji."
+                    badge={s.lc_sec3?.total_unfilled ?? 0}
+                    badgeColor="orange"
+                  >
+                    {s.lc_sec3 && <LcSec3 data={s.lc_sec3} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="4. TEXTY přehled generování"
+                    description="Stav generování textů (název, krátký popis, detailní popis) dle kategorií a jazyků — % pokrytí."
+                    badge={s.lc_sec4?.languageOrder.length ?? 0}
+                    badgeColor="gray"
+                  >
+                    {s.lc_sec4 && <LcSec4 data={s.lc_sec4} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="5. PŘEKLADY — nevyplněné hodnoty"
+                    description="Heatmapa chybějících překladů dle typu entity a jazyka — identifikace systematických mezer."
+                    badge={s.lc_sec5?.nonzero_combos ?? 0}
+                    badgeColor="orange"
+                  >
+                    {s.lc_sec5 && <LcSec5 data={s.lc_sec5} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="6. Thule generátor"
+                    description="Záznamy bez překladu rozdělené do 5 kategorií Thule generátoru (unifikovaný název, název auta, konfigurace, sloupec, vlastnost)."
+                    badge={s.lc_sec6?.total ?? 0}
+                    badgeColor="purple"
+                  >
+                    {s.lc_sec6 && <LcSec6 data={s.lc_sec6} date={report.date} />}
+                  </CollapsibleSection>
+
+                  <CollapsibleSection
+                    title="7. Šablony s nevyplněným vzorcem pro název"
+                    description="Šablony, které nemají vyplněný textový vzorec pro generování názvu produktu."
+                    badge={s.lc_sec7?.total ?? 0}
+                    badgeColor="orange"
+                  >
+                    {s.lc_sec7 && <LcSec7 data={s.lc_sec7} date={report.date} />}
                   </CollapsibleSection>
                 </div>
               </>

@@ -4,6 +4,7 @@ import type { AnyNode, Element } from 'domhandler'
 import { parseSkladovyEmail } from '@/lib/parser-skladovy'
 import { parseUcetniEmail } from '@/lib/parser-ucetni'
 import { parseMasterdataEmail } from '@/lib/parser-masterdata'
+import { parseLocalizationEmail } from '@/lib/parser-localization'
 import {
   Report,
   ReportSections,
@@ -1173,6 +1174,7 @@ export function parseReportEmail(html: string, date: string, fetchedAt: string, 
   if (reportType === 'skladovy') return parseSkladovyEmail(html, date, fetchedAt)
   if (reportType === 'ucetni') return parseUcetniEmail(html, date, fetchedAt)
   if (reportType === 'masterdata') return parseMasterdataEmail(html, date, fetchedAt)
+  if (reportType === 'localization') return parseLocalizationEmail(html, date, fetchedAt)
 
   const $ = cheerio.load(html)
   const sections: ReportSections = {}

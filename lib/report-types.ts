@@ -43,6 +43,14 @@ export const REPORT_TYPES: ReportTypeConfig[] = [
       return subject.toLowerCase().includes('masterdata report')
     },
   },
+  {
+    id: 'localization',
+    label: 'Lokalizace',
+    subjectKeyword: 'Localization report',
+    matchSubject: (subject: string) => {
+      return subject.toLowerCase().includes('localization report')
+    },
+  },
 ]
 
 export const DEFAULT_REPORT_TYPE = 'obchodni'
