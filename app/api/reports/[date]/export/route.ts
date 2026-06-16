@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { loadReport } from '@/lib/storage'
+import { auth } from '@/lib/auth'
 import Papa from 'papaparse'
 import type { Report, MarzeProduct } from '@/types/report'
 
@@ -35,22 +36,14 @@ function sectionToCsv(report: Report, section: string): string {
     }
     case '1': {
       const items = s.sec1?.sample ?? []
-      return Papa.unparse(
-        items.map((i) => ({
-          ID: i.id,
-          Typ: i.typ,
-          Název: i.nazev,
-          'Skupina ID': i.skupina_id,
-          Skupina: i.skupina_nazev,
-          Admin: i.admin,
-        }))
-      )
+      return Papa.unparse(items.map((i) => ({
+        ID: i.id, Typ: i.typ, Název: i.nazev, 'Skupina ID': i.skupina_id,
+        Skupina: i.skupina_nazev, Admin: i.admin,
+      })))
     }
     case '2': {
       const items = s.sec2?.sample ?? []
-      return Papa.unparse(
-        items.map((i) => ({ Dodavatel: i.dodavatel, Kód: i.kod, Název: i.nazev, Skupina: i.skupina, Admin: i.admin, Skladem: i.skladem }))
-      )
+      return Papa.unparse(items.map((i) => ({ Dodavatel: i.dodavatel, Kód: i.kod, Název: i.nazev, Skupina: i.skupina, Admin: i.admin, Skladem: i.skladem })))
     }
     case '3': {
       const items = s.sec3?.sample ?? []
@@ -58,16 +51,9 @@ function sectionToCsv(report: Report, section: string): string {
     }
     case '4': {
       const items = s.sec4?.products ?? []
-      return Papa.unparse(
-        items.map((p) => ({
-          ID: p.id,
-          Typ: p.typ,
-          Název: p.nazev,
-          Skupina: p.skupina,
-          Admin: p.admin,
-          Země: p.countries.join(', '),
-        }))
-      )
+      return Papa.unparse(items.map((p) => ({
+        ID: p.id, Typ: p.typ, Název: p.nazev, Skupina: p.skupina, Admin: p.admin, Země: p.countries.join(', '),
+      })))
     }
     case '7': {
       const items = s.sec7?.items ?? []
@@ -75,19 +61,10 @@ function sectionToCsv(report: Report, section: string): string {
     }
     case '9': {
       const items = s.sec9?.items ?? []
-      return Papa.unparse(
-        items.map((i) => ({
-          Dodavatel: i.dodavatel,
-          Kód: i.kod,
-          Název: i.nazev,
-          Skupina: i.skupina,
-          Admin: i.admin,
-          Ks: i.ks,
-          'OZ číslo': i.oz_cislo,
-          Termín: i.termin,
-          Level: i.level,
-        }))
-      )
+      return Papa.unparse(items.map((i) => ({
+        Dodavatel: i.dodavatel, Kód: i.kod, Název: i.nazev, Skupina: i.skupina, Admin: i.admin,
+        Ks: i.ks, 'OZ číslo': i.oz_cislo, Termín: i.termin, Level: i.level,
+      })))
     }
     case '11': {
       const items = s.sec11?.items ?? []
@@ -106,18 +83,10 @@ function sectionToCsv(report: Report, section: string): string {
       for (const sg of s.sec14?.skupiny ?? []) {
         for (const p of sg.produkty) {
           rows.push({
-            Skupina: sg.skupina,
-            Kód: p.kod,
-            Název: p.nazev,
-            'Marže CZ': p.marze_CZ,
-            'Marže IT': p.marze_IT,
-            'Marže CH': p.marze_CH,
-            'Marže WEU': p.marze_WEU,
-            'Marže SK': p.marze_SK,
-            'Marže PL': p.marze_PL,
-            'Marže GB': p.marze_GB,
-            'Marže DEAT': p.marze_DEAT,
-            Skladem: p.skladem,
+            Skupina: sg.skupina, Kód: p.kod, Název: p.nazev,
+            'Marže CZ': p.marze_CZ, 'Marže IT': p.marze_IT, 'Marže CH': p.marze_CH,
+            'Marže WEU': p.marze_WEU, 'Marže SK': p.marze_SK, 'Marže PL': p.marze_PL,
+            'Marže GB': p.marze_GB, 'Marže DEAT': p.marze_DEAT, Skladem: p.skladem,
           })
         }
       }
@@ -134,9 +103,12 @@ function sectionToCsv(report: Report, section: string): string {
 
 export async function GET(
   req: Request,
-  { params }: { params: { date: string } }
+  { params }: { params: Promise<{ date: string }> },
 ) {
-  const { date } = params
+  const session = await auth()
+  if (!session?.user) return NextResponse.json({ error: 'Nepřihlášen' }, { status: 401 })
+
+  const { date } = await params
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return NextResponse.json({ error: 'Invalid date format' }, { status: 400 })
   }

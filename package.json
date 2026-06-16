@@ -6,33 +6,49 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "fetch-report": "npx ts-node --project tsconfig.scripts.json scripts/fetch-report.ts",
-    "test:imap": "npx ts-node --project tsconfig.scripts.json scripts/test-imap.ts",
-    "test:parser": "npx ts-node --project tsconfig.scripts.json scripts/test-parser.ts"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:imap": "npx tsx --project tsconfig.scripts.json scripts/test-imap.ts",
+    "test:parser": "npx tsx --project tsconfig.scripts.json scripts/test-parser.ts",
+    "test:sections": "npx tsx scripts/test-sections.ts",
+    "fetch-report": "npx tsx --project tsconfig.scripts.json scripts/fetch-report.ts"
   },
   "dependencies": {
     "@vercel/blob": "^2.4.0",
+    "bcryptjs": "^3.0.3",
     "cheerio": "^1.0.0",
     "date-fns": "^3.6.0",
     "dotenv": "^16.4.5",
+    "googleapis": "^173.0.0",
     "imapflow": "^1.0.162",
     "mailparser": "^3.7.1",
-    "next": "14.2.5",
+    "next": "^16.2.9",
+    "next-auth": "^5.0.0-beta.31",
     "papaparse": "^5.4.1",
     "react": "^18",
     "react-dom": "^18",
-    "recharts": "^2.12.7"
+    "recharts": "^2.12.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/bcryptjs": "^2.4.6",
     "@types/mailparser": "^3.4.4",
     "@types/node": "^20",
     "@types/papaparse": "^5.3.14",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@vitejs/plugin-react": "^6.0.2",
+    "@vitest/coverage-v8": "^4.1.9",
     "autoprefixer": "^10",
+    "jsdom": "^29.1.1",
     "postcss": "^8.5.10",
     "tailwindcss": "^3",
     "ts-node": "^10.9.2",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.9"
   }
 }

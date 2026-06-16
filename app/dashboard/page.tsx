@@ -1,6 +1,8 @@
 import { loadIndex, loadReport } from '@/lib/storage'
 import DashboardClient from '@/components/DashboardClient'
 import { redirect } from 'next/navigation'
+import { auth } from '@/lib/auth'
+import { signOut } from '@/lib/auth'
 import type { Report, ReportIndex } from '@/types/report'
 import { REPORT_TYPES, DEFAULT_REPORT_TYPE } from '@/lib/report-types'
 
@@ -11,7 +13,7 @@ export interface StorageStatus {
 }
 
 interface Props {
-  searchParams: { date?: string; type?: string }
+  searchParams: Promise<{ date?: string; type?: string }>
 }
 
 export const dynamic = 'force-dynamic'
@@ -33,7 +35,11 @@ function getStorageStatus(): StorageStatus {
 }
 
 export default async function DashboardPage({ searchParams }: Props) {
-  const activeType = REPORT_TYPES.find((t) => t.id === searchParams.type)?.id ?? DEFAULT_REPORT_TYPE
+  const session = await auth()
+  if (!session?.user) redirect('/auth/login')
+
+  const { date: rawDate, type: rawType } = await searchParams
+  const activeType = REPORT_TYPES.find((t) => t.id === rawType)?.id ?? DEFAULT_REPORT_TYPE
   const storageStatus = getStorageStatus()
 
   const fullIndex: ReportIndex = await loadIndex()
@@ -42,7 +48,7 @@ export default async function DashboardPage({ searchParams }: Props) {
     .slice(0, 10)
   const filteredIndex: ReportIndex = { reports: typeReports }
 
-  let targetDate = searchParams.date
+  let targetDate = rawDate
   if (!targetDate && typeReports.length > 0) {
     targetDate = typeReports[0].date
   }
@@ -55,14 +61,38 @@ export default async function DashboardPage({ searchParams }: Props) {
     sections: {},
   })
 
+  const isAdmin = (session.user as { role?: string }).role === 'admin'
+
+  const navBar = (
+    <div className="bg-white border-b px-4 py-2 flex items-center justify-between text-sm">
+      <div className="flex items-center gap-4">
+        <span className="font-medium text-gray-700">Dashboard</span>
+        <a href="/dashboard/search-console" className="text-blue-600 hover:underline">Search Console</a>
+        {isAdmin && <a href="/dashboard/users" className="text-purple-600 hover:underline">Uživatelé</a>}
+      </div>
+      <div className="flex items-center gap-3 text-gray-500">
+        <span>{session.user.name}</span>
+        <form action={async () => {
+          'use server'
+          await signOut({ redirectTo: '/auth/login' })
+        }}>
+          <button type="submit" className="text-red-500 hover:underline">Odhlásit</button>
+        </form>
+      </div>
+    </div>
+  )
+
   if (!targetDate || typeReports.length === 0) {
     return (
-      <DashboardClient
-        report={emptyReport(new Date().toISOString().slice(0, 10))}
-        index={filteredIndex}
-        activeType={activeType}
-        storageStatus={storageStatus}
-      />
+      <>
+        {navBar}
+        <DashboardClient
+          report={emptyReport(new Date().toISOString().slice(0, 10))}
+          index={filteredIndex}
+          activeType={activeType}
+          storageStatus={storageStatus}
+        />
+      </>
     )
   }
 
@@ -72,21 +102,27 @@ export default async function DashboardPage({ searchParams }: Props) {
       redirect(`/dashboard?type=${activeType}&date=${typeReports[0].date}`)
     }
     return (
-      <DashboardClient
-        report={emptyReport(targetDate)}
-        index={filteredIndex}
-        activeType={activeType}
-        storageStatus={storageStatus}
-      />
+      <>
+        {navBar}
+        <DashboardClient
+          report={emptyReport(targetDate)}
+          index={filteredIndex}
+          activeType={activeType}
+          storageStatus={storageStatus}
+        />
+      </>
     )
   }
 
   return (
-    <DashboardClient
-      report={report}
-      index={filteredIndex}
-      activeType={activeType}
-      storageStatus={storageStatus}
-    />
+    <>
+      {navBar}
+      <DashboardClient
+        report={report}
+        index={filteredIndex}
+        activeType={activeType}
+        storageStatus={storageStatus}
+      />
+    </>
   )
 }
